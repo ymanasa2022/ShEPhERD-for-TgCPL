@@ -1,4 +1,4 @@
-# TgCPL ShEPhERD-2 — Setup & Drug Design Guide
+# TgCPL ShEPhERD— Setup & Drug Design Guide
 
 ## What's in this folder
 
