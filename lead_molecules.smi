@@ -1,0 +1,18 @@
+# TgCPL Lead Molecules for ShEPhERD-2 Input
+# Source: TgCPL Main Draft 6
+# Format: SMILES <tab> CompoundID <tab> TgCPL_IC50_nM <tab> HsCPL_IC50_nM <tab> Selectivity
+#
+# All are triazine-nitrile reversible covalent inhibitors targeting Cys31 (TgCPL) / Cys25 (HsCPL)
+# Core scaffold: 4-cyano-6-morpholino-1,3,5-triazine
+# P1 = morpholine (fixed), P2 = amine chain, P3 = arylmethyl group
+#
+# Best leads for ShEPhERD seeding:
+
+CCN(CC)CCN(Cc1ccc(F)cc1)c1nc(C#N)nc(N2CCOCC2)n1	Cpd1	320	2240	7.0
+CCN(CC)CCN(c1nc(C#N)nc(N2CCOCC2)n1)C(c1ccc(F)cc1)C1CC1	Cpd2	481	4496	9.3
+CCN(CC)CCN(c1nc(C#N)nc(N2CCOCC2)n1)C(c1ccc(F)cc1)C1CCC1	Cpd10	452	2772	6.1
+CCN(CC)CCN(c1nc(C#N)nc(N2CCOCC2)n1)C(c1ccc(F)cc1)C1CCCC1	Cpd11	604	9298	15.4
+CCN(CC)CCN(c1nc(C#N)nc(N2CCOCC2)n1)C(c1ccc(F)cc1)C1CCCCC1	Cpd12	629	23245	36.9
+CCN(CC)CCN(c1nc(C#N)nc(N2CCOCC2)n1)C(c1ccc(F)cc1)C1CCCCCC1	Cpd13	497	19695	39.6
+N#Cc1nc(N2CCOCC2)nc(N(CCC2CCNCC2)C(c2ccc(F)cc2)C2CCCCC2)n1	Cpd18	210	8080	38.5
+CN1CCC(CCN(c2nc(C#N)nc(N3CCOCC3)n2)C(c2ccc(F)cc2)C2CCCCC2)CC1	Cpd19	418	6250	15.0
