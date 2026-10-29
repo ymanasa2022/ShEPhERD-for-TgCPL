@@ -93,9 +93,27 @@ LEADS = {
     },
 }
 
-# Triazine nitrile warhead core SMARTS (P1=morpholine fixed; covalent CN)
-# Used for scaffold-constrained generation
-TRIAZINE_CORE_SMARTS = "N#Cc1nc(N2CCOCC2)ncn1"
+# Scaffold cores for --scaffold-constraint, smallest first.
+#
+# "warhead" is just the covalent nitrile and the triazine it hangs off: the part
+# that is mechanistically required, since the C#N is what reacts with the
+# catalytic cysteine. Everything else — including the morpholine at P1 — is left
+# for ShEPhERD to rebuild, so S1 is explorable.
+#
+# "warhead_morpholine" additionally fixes the P1 morpholine. On Cpd18 that is 14
+# of 37 heavy atoms versus 8, so it leaves markedly less room to generate into.
+#
+# Caveat for "warhead": the nitrile's electrophilicity depends on how electron
+# -poor the triazine is, which the P1 substituent tunes. Replacing morpholine
+# changes covalent reactivity, so generated analogues need a reactivity check,
+# not just a shape score.
+SCAFFOLD_CORES = {
+    "warhead": "N#Cc1ncncn1",
+    "warhead_morpholine": "N#Cc1nc(N2CCOCC2)ncn1",
+}
+
+# Back-compat alias; previously the only core.
+TRIAZINE_CORE_SMARTS = SCAFFOLD_CORES["warhead_morpholine"]
 
 
 def embed_lead(smiles: str, seed: int = 42) -> Chem.Mol | None:
@@ -104,9 +122,9 @@ def embed_lead(smiles: str, seed: int = 42) -> Chem.Mol | None:
     return mol
 
 
-def get_scaffold_atom_indices(mol: Chem.Mol) -> list[int]:
-    """Return atom indices matching the triazine-CN-morpholine core."""
-    core_query = Chem.MolFromSmarts(TRIAZINE_CORE_SMARTS)
+def get_scaffold_atom_indices(mol: Chem.Mol, core: str = "warhead_morpholine") -> list[int]:
+    """Return atom indices matching the chosen scaffold core (see SCAFFOLD_CORES)."""
+    core_query = Chem.MolFromSmarts(SCAFFOLD_CORES[core])
     if core_query is None:
         return []
     matches = mol.GetSubstructMatches(core_query, useChirality=False)
@@ -129,6 +147,7 @@ def run_generation(
     add_pharms_max: int,
     neutralize_esp: bool,
     use_scaffold_constraint: bool,
+    scaffold_core: str,
     output_dir: Path,
     device: str,
     seed: int,
@@ -157,25 +176,27 @@ def run_generation(
     writer.write(ref_mol)
     writer.close()
 
+    # Scaffold constraint (optional): fix the core atoms. This has to be decided
+    # before profile extraction, because the atom indices go into the profile.
+    scaffold_atom_indices = None
+    if use_scaffold_constraint:
+        scaffold_atom_indices = get_scaffold_atom_indices(ref_mol, scaffold_core)
+        if scaffold_atom_indices:
+            print(f"  Scaffold constraint ({scaffold_core}): {len(scaffold_atom_indices)} atoms fixed")
+        else:
+            print("  WARNING: Scaffold atoms not matched; running unconstrained")
+
     # Extract interaction profile (shape + ESP + pharmacophores)
     print("  Extracting interaction profile (xTB)...")
     profile = extract_interaction_profile(
         ref_mol,
         xtb_optimize=True,
         neutralize_esp=neutralize_esp,
+        condition_atom_inds=scaffold_atom_indices,
     )
     if profile is None:
         print(f"  ERROR: Could not extract interaction profile for {ref_name}")
         return []
-
-    # Scaffold constraint (optional): fix triazine core atoms
-    scaffold_atom_indices = None
-    if use_scaffold_constraint:
-        scaffold_atom_indices = get_scaffold_atom_indices(ref_mol)
-        if scaffold_atom_indices:
-            print(f"  Scaffold constraint: {len(scaffold_atom_indices)} atoms fixed")
-        else:
-            print("  WARNING: Scaffold atoms not matched; running unconstrained")
 
     # Generate
     print(f"  Generating {n_samples} samples (batch_size={batch_size})...")
@@ -188,18 +209,31 @@ def run_generation(
         condition=profile,
         condition_modalities=condition,
     )
-    if add_atoms_min != 0 or add_atoms_max != 0:
-        gen_kwargs["add_atoms_range"] = (add_atoms_min, add_atoms_max)
-    if add_pharms_min != 0 or add_pharms_max != 0:
-        gen_kwargs["add_pharms_range"] = (add_pharms_min, add_pharms_max)
     if scaffold_atom_indices:
-        gen_kwargs["scaffold_atoms"] = scaffold_atom_indices
+        gen_kwargs["scaffold_conditioning"] = True
+
+    # "Grow" the molecule by asking for more atoms/pharmacophores than the
+    # reference has. generate() takes the counts directly (per-sample lists are
+    # allowed), so the range is sampled here rather than passed through.
+    grow_atoms = add_atoms_min != 0 or add_atoms_max != 0
+    grow_pharms = add_pharms_min != 0 or add_pharms_max != 0
+    rng = np.random.default_rng(seed)
 
     all_mols = []
     n_generated = 0
     while n_generated < n_samples:
         this_batch = min(batch_size, n_samples - n_generated)
         gen_kwargs["batch_size"] = this_batch
+        if grow_atoms:
+            gen_kwargs["N_x1"] = [
+                int(profile.n_atoms + rng.integers(add_atoms_min, add_atoms_max + 1))
+                for _ in range(this_batch)
+            ]
+        if grow_pharms:
+            gen_kwargs["N_x4"] = [
+                int(profile.n_pharms + rng.integers(add_pharms_min, add_pharms_max + 1))
+                for _ in range(this_batch)
+            ]
         samples = model.generate(**gen_kwargs)
         n_generated += len(samples)
 
@@ -249,6 +283,7 @@ def run_dual_target_selectivity(
     n_samples: int,
     batch_size: int,
     use_scaffold_constraint: bool,
+    scaffold_core: str,
     output_dir: Path,
     seed: int,
 ) -> list[Chem.Mol]:
@@ -353,10 +388,10 @@ def run_dual_target_selectivity(
     # --- 4. Scaffold constraint (optional) ---
     scaffold_condition = None
     if use_scaffold_constraint:
-        core_atom_inds = get_scaffold_atom_indices(tgcpl_mol)
+        core_atom_inds = get_scaffold_atom_indices(tgcpl_mol, scaffold_core)
         if core_atom_inds:
             scaffold_condition = ConditionAtoms.from_mol(tgcpl_mol, inds=core_atom_inds)
-            print(f"  Scaffold constraint: {len(core_atom_inds)} triazine-core atoms fixed")
+            print(f"  Scaffold constraint ({scaffold_core}): {len(core_atom_inds)} core atoms fixed")
         else:
             print("  WARNING: Scaffold not matched; running without constraint")
 
@@ -478,7 +513,13 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--scaffold-constraint", action="store_true",
-        help="Fix triazine-CN-morpholine warhead atoms during generation",
+        help="Fix the scaffold core atoms during generation (see --scaffold-core)",
+    )
+    parser.add_argument(
+        "--scaffold-core", choices=list(SCAFFOLD_CORES), default="warhead_morpholine",
+        help="Which core --scaffold-constraint fixes: 'warhead' is the nitrile + "
+             "triazine only, freeing P1 so S1 can be explored; 'warhead_morpholine' "
+             "also fixes the P1 morpholine",
     )
     parser.add_argument(
         "--output-dir", type=Path, default=Path("./tgcpl_outputs"),
@@ -535,7 +576,8 @@ def main() -> None:
     print(f"  Conditioning: {condition_str}")
     print(f"  Samples/ref: {args.n_samples}")
     print(f"  Output:      {args.output_dir}")
-    print(f"  Scaffold constraint: {args.scaffold_constraint}")
+    print(f"  Scaffold constraint: {args.scaffold_constraint}"
+          + (f" ({args.scaffold_core})" if args.scaffold_constraint else ""))
     print(f"  Extra atoms range: {args.add_atoms_range}")
 
     # Load model (downloads weights from HuggingFace on first run)
@@ -562,6 +604,7 @@ def main() -> None:
             add_pharms_max=args.add_pharms_range[1],
             neutralize_esp=args.neutralize_esp,
             use_scaffold_constraint=args.scaffold_constraint,
+            scaffold_core=args.scaffold_core,
             output_dir=args.output_dir,
             device=device,
             seed=args.seed,
@@ -581,6 +624,7 @@ def main() -> None:
             n_samples=args.n_samples,
             batch_size=args.batch_size,
             use_scaffold_constraint=args.scaffold_constraint,
+            scaffold_core=args.scaffold_core,
             output_dir=args.output_dir,
             seed=args.seed,
         )
