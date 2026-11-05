@@ -2,7 +2,7 @@
 # =============================================================================
 # greatlakes_tgcpl.sh — the five TgCPL generation runs, as a job array.
 #
-# Submit all:        sbatch greatlakes_tgcpl.sh
+# Submit all:        sbatch slurm_scripts/greatlakes_tgcpl.sbatch
 # Submit a subset:   sbatch --array=1,3 greatlakes_tgcpl.sh
 #
 # An array runs the five independently and in parallel, so one failure does not
@@ -25,7 +25,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/greatlakes_env.sh"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+source "$REPO_ROOT/setup/greatlakes_env.sh"
 
 cd "$TGCPL_DIR"
 
@@ -38,7 +39,7 @@ case "$SLURM_ARRAY_TASK_ID" in
 
   1)  # All 8 leads, full conditioning. The broad baseline sweep.
       echo ">>> run1: all leads, shape+ESP+pharm, 50 each (400 total)"
-      python tgcpl_generate.py \
+      python "$TGCPL_PKG_DIR/tgcpl_generate.py" \
           --ref-smiles all \
           --n-samples 50 \
           --batch-size 25 \
@@ -49,7 +50,7 @@ case "$SLURM_ARRAY_TASK_ID" in
 
   2)  # Drop the pharmacophore constraint -> more structural diversity.
       echo ">>> run2: Cpd18, shape+ESP only, 100 samples"
-      python tgcpl_generate.py \
+      python "$TGCPL_PKG_DIR/tgcpl_generate.py" \
           --ref-smiles Cpd18 \
           --n-samples 100 \
           --batch-size 25 \
@@ -60,7 +61,7 @@ case "$SLURM_ARRAY_TASK_ID" in
 
   3)  # Grow 2-6 heavy atoms: explore extended P2 / larger P3.
       echo ">>> run3: Cpd18, grown by 2-6 atoms, 100 samples"
-      python tgcpl_generate.py \
+      python "$TGCPL_PKG_DIR/tgcpl_generate.py" \
           --ref-smiles Cpd18 \
           --n-samples 100 \
           --batch-size 25 \
@@ -73,7 +74,7 @@ case "$SLURM_ARRAY_TASK_ID" in
 
   4)  # Keep the triazine-CN-morpholine warhead fixed.
       echo ">>> run4: Cpd12, scaffold-constrained, 100 samples"
-      python tgcpl_generate.py \
+      python "$TGCPL_PKG_DIR/tgcpl_generate.py" \
           --ref-smiles Cpd12 \
           --n-samples 100 \
           --batch-size 25 \
@@ -85,7 +86,7 @@ case "$SLURM_ARRAY_TASK_ID" in
 
   5)  # Selectivity encoded at the model level: ON Cpd18, NOT Cpd1.
       echo ">>> run5: dual-target Cpd18 vs Cpd1, scaffold-constrained, 100 samples"
-      python tgcpl_generate.py \
+      python "$TGCPL_PKG_DIR/tgcpl_generate.py" \
           --dual-target \
           --dual-tgcpl-ref Cpd18 \
           --dual-hscpl-ref Cpd1 \
@@ -117,7 +118,7 @@ case "$SLURM_ARRAY_TASK_ID" in
       # Pass the two values space-separated. "--add-atoms-range=-17 -11" does
       # NOT parse; argparse needs "--add-atoms-range -17 -11".
       echo ">>> run6: VMCC-0005199/Cpd12, P1+P2+P3 free, N_x1 57-63, 150 samples"
-      python tgcpl_generate.py \
+      python "$TGCPL_PKG_DIR/tgcpl_generate.py" \
           --ref-smiles Cpd12 \
           --n-samples 150 \
           --batch-size 25 \
@@ -127,7 +128,7 @@ case "$SLURM_ARRAY_TASK_ID" in
           --add-atoms-range -17 -11 \
           --output-dir "$OUTPUT_ROOT/run6_vmcc5199_mw400" \
           --seed 42
-      python filter_generated.py "$OUTPUT_ROOT/run6_vmcc5199_mw400" \
+      python "$GENERATE_DIR/filter_generated.py" "$OUTPUT_ROOT/run6_vmcc5199_mw400" \
           --max-mw 400 --max-rotb 7 --max-ring-size 7
       ;;
 

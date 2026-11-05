@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # =============================================================================
 # greatlakes_smoke_test.sh — short GPU job proving the install works.
-# Submit:  sbatch greatlakes_smoke_test.sh
+# Submit:  sbatch tests/greatlakes_smoke_test.sh
 # Run this BEFORE the big jobs; it costs ~10 min of one GPU.
 # =============================================================================
 #SBATCH --job-name=tgcpl_smoke
@@ -19,7 +19,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/greatlakes_env.sh"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+source "$REPO_ROOT/setup/greatlakes_env.sh"
 
 echo "=== Smoke test ==="
 echo "node    : $HOSTNAME"
@@ -54,7 +55,7 @@ python examples/basic_inference/basic_inference_test.py \
 echo
 echo "--- 3. real TgCPL lead, 2 samples ---"
 cd "$TGCPL_DIR"
-python tgcpl_generate.py \
+python "$TGCPL_PKG_DIR/tgcpl_generate.py" \
     --ref-smiles Cpd18 \
     --n-samples 2 \
     --batch-size 2 \
@@ -63,4 +64,4 @@ python tgcpl_generate.py \
 
 echo
 echo "=== Smoke test finished: $(date) ==="
-echo "If all three sections passed, submit:  sbatch greatlakes_tgcpl.sh"
+echo "If all three sections passed, submit:  sbatch slurm_scripts/greatlakes_tgcpl.sbatch"

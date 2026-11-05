@@ -26,8 +26,15 @@ from rdkit.DataStructs import BulkTanimotoSimilarity
 
 RDLogger.DisableLog("rdApp.*")
 
-# Lead SMILES live in tgcpl_generate.py; import rather than duplicate them.
-from tgcpl_generate import LEADS
+# Lead SMILES live in the tgcpl package; import rather than duplicate them.
+# Taken from tgcpl.leads directly rather than via tgcpl_generate, so reporting
+# does not drag in torch and the whole shepherd stack just to read a dict.
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from tgcpl.leads import LEADS  # noqa: E402
 
 _FPGEN = GetMorganGenerator(radius=2, fpSize=2048)
 

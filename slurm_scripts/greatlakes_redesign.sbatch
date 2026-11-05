@@ -44,7 +44,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/greatlakes_env.sh"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+source "$REPO_ROOT/setup/greatlakes_env.sh"
 cd "$TGCPL_DIR"
 
 # --- shared settings ---------------------------------------------------------
@@ -107,7 +108,7 @@ echo "output    : $OUT_DIR"
 echo
 
 # --- generate ----------------------------------------------------------------
-python tgcpl_generate.py \
+python "$TGCPL_PKG_DIR/tgcpl_generate.py" \
     --ref-smiles "$REF" \
     --n-samples "$N_SAMPLES" \
     --batch-size "$BATCH_SIZE" \
@@ -123,7 +124,7 @@ python tgcpl_generate.py \
 # coordinates, so it goes straight to Boltz-2 without re-embedding.
 echo
 echo ">>> filtering ${TAG}"
-python filter_generated.py "$OUT_DIR" \
+python "$GENERATE_DIR/filter_generated.py" "$OUT_DIR" \
     --max-mw "$MAX_MW" \
     --max-rotb "$MAX_ROTB" \
     --max-ring-size "$MAX_RING"

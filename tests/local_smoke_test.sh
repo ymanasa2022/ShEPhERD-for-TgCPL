@@ -15,7 +15,8 @@ set -euo pipefail
 STAGE="${1:-default}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/local_env.sh"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+source "$REPO_ROOT/setup/local_env.sh"
 
 echo "=== Local smoke test ==="
 echo "host    : $(hostname)"
@@ -62,7 +63,7 @@ fi
 if run_stage tgcpl no; then
 echo "--- 3. tgcpl_generate.py (Cpd18, 1 sample, CPU ~3-4 min) ---"
 cd "$TGCPL_DIR"
-python tgcpl_generate.py \
+python "$TGCPL_PKG_DIR/tgcpl_generate.py" \
     --ref-smiles Cpd18 \
     --n-samples 1 \
     --batch-size 1 \

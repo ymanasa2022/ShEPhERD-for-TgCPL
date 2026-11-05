@@ -6,9 +6,18 @@
 # =============================================================================
 
 CONDA_ENV="shepherd"
-TGCPL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# This file lives in setup/, so the repo root is one level up.
+TGCPL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 REPO_DIR="$(cd "$TGCPL_DIR/.." && pwd)/shepherd2"
-OUTPUT_ROOT="$TGCPL_DIR/local_outputs"
+OUTPUT_ROOT="$TGCPL_DIR/tests/local_outputs"
+
+# Where the entry points and the tgcpl package live, so callers do not have to
+# know the layout. The scripts also bootstrap sys.path themselves, so these are
+# a convenience, not a requirement.
+SCRIPTS_DIR="$TGCPL_DIR/scripts"
+GENERATE_DIR="$SCRIPTS_DIR/generate"
+TGCPL_PKG_DIR="$SCRIPTS_DIR/tgcpl"
 
 source "$(conda info --base)/etc/profile.d/conda.sh"
 conda activate "$CONDA_ENV"

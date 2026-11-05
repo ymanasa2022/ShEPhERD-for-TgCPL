@@ -57,9 +57,16 @@ from shepherd.interaction_profile import extract_interaction_profile, ConditionA
 torch.set_float32_matmul_precision("high")
 
 # ---------------------------------------------------------------------------
-# Shared definitions now live in the tgcpl package. They are re-exported here
-# because summarize_run.py and baseline_scores.py import them from this module.
+# This file sits INSIDE the tgcpl package but is run as a script, so Python puts
+# scripts/tgcpl/ on sys.path rather than scripts/, and a plain `import tgcpl`
+# would miss. Adding the package's parent makes the import work from any
+# working directory, with no PYTHONPATH to set in the job scripts.
 # ---------------------------------------------------------------------------
+import sys as _sys
+from pathlib import Path as _Path
+
+_sys.path.insert(0, str(_Path(__file__).resolve().parents[1]))
+
 from tgcpl.conformers import embed_lead                       # noqa: E402,F401
 from tgcpl.leads import LEADS, lead_names, registry_id        # noqa: E402,F401
 from tgcpl.scaffolds import (                                 # noqa: E402,F401

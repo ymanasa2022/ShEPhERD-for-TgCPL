@@ -34,7 +34,12 @@ from pathlib import Path
 
 from rdkit import Chem, RDLogger
 
-from tgcpl.properties import (
+# scripts/generate/ is this file's directory; the tgcpl package sits beside it
+# under scripts/. Put the parent on sys.path so `import tgcpl` resolves however
+# this is invoked.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from tgcpl.properties import (  # noqa: E402
     DEFAULT_THRESHOLDS,
     describe,
     pains_catalog,

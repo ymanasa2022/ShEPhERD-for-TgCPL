@@ -32,7 +32,11 @@ from rdkit.Chem import AllChem, Descriptors, rdMolDescriptors as rdmd
 RDLogger.DisableLog("rdApp.*")
 
 REPO = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(REPO))
+GENERATE = REPO / "scripts" / "generate"
+TGCPL_PKG = REPO / "scripts" / "tgcpl"
+
+# The package lives under scripts/, not at the repo root.
+sys.path.insert(0, str(REPO / "scripts"))
 
 from tgcpl import leads, properties, scaffolds          # noqa: E402
 
@@ -196,7 +200,7 @@ def test_filter_io() -> None:
         w.close()
 
         proc = subprocess.run(
-            [sys.executable, str(REPO / "filter_generated.py"), str(Path(td) / "run"),
+            [sys.executable, str(GENERATE / "filter_generated.py"), str(Path(td) / "run"),
              "--max-mw", "500", "--max-rotb", "10", "--max-ring-size", "7"],
             capture_output=True, text=True, cwd=str(REPO),
         )
@@ -226,7 +230,7 @@ def test_generation(device: str) -> None:
     for core in ("warhead_p2n", "warhead_morpholine_p2n"):
         with tempfile.TemporaryDirectory() as td:
             cmd = [
-                sys.executable, str(REPO / "tgcpl_generate.py"),
+                sys.executable, str(TGCPL_PKG / "tgcpl_generate.py"),
                 "--ref-smiles", "Cpd12", "--n-samples", "2", "--batch-size", "2",
                 "--condition", "all", "--scaffold-constraint",
                 "--scaffold-core", core,

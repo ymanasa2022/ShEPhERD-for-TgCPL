@@ -110,9 +110,9 @@ cat <<EOF
 
 Job scripts activate this themselves via greatlakes_env.sh. To activate by
 hand:
-    source $SCRIPT_DIR/greatlakes_env.sh
+    source $TGCPL_DIR/setup/greatlakes_env.sh
 
 Next:
     python $TGCPL_DIR/tests/test_redesign.py     # fast, no GPU
-    sbatch $SCRIPT_DIR/greatlakes_smoke_test.sh  # checks the GPU
+    sbatch $TGCPL_DIR/tests/greatlakes_smoke_test.sh  # checks the GPU
 EOF
