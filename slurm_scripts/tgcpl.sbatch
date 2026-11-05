@@ -9,21 +9,24 @@
 #SBATCH --time=04:00:00
 
 # =============================================================================
-# SLURM job script for TgCPL ShEPhERD-2 generation
+# GENERIC SLURM job script for TgCPL ShEPhERD-2 generation.
 #
-# Edit the paths below, then submit with:
+# For Great Lakes use greatlakes_tgcpl.sbatch instead. This is the portable
+# fallback: hardcoded paths, conda activated by name.
+#
+# Edit the three paths below, then:
 #   mkdir -p logs
-#   sbatch slurm_tgcpl.sh
+#   sbatch slurm_scripts/tgcpl.sbatch
 # =============================================================================
 
-SHEPHERD_DIR="$HOME/shepherd2"           # path to cloned repo
-SCRIPT="$SHEPHERD_DIR/tgcpl_generate.py"
-OUTPUT_DIR="$SHEPHERD_DIR/tgcpl_outputs"
+TGCPL_DIR="$HOME/ShEPhERD-for-TgCPL"     # this repo
+SCRIPT="$TGCPL_DIR/scripts/tgcpl/tgcpl_generate.py"
+OUTPUT_DIR="$TGCPL_DIR/tgcpl_outputs"
 
 module load cuda/12.6 2>/dev/null || true   # adjust to your HPC module name
 conda activate shepherd2
 
-cd "$SHEPHERD_DIR"
+cd "$TGCPL_DIR"
 mkdir -p logs
 
 echo "Job started: $(date)"
