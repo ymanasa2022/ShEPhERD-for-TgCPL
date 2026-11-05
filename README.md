@@ -251,27 +251,11 @@ react.
 
 ## Lead molecules
 
-Structures and assay values are **not tracked by git**. `scripts/tgcpl/leads.py`
-loads them at import from `data/leads.tsv`, which is gitignored.
+`scripts/tgcpl/leads.py` loads them at import from `data/leads.tsv`, which is
+tracked, so a clone or `git pull` brings it. `TGCPL_LEADS` overrides the path
+if you want to run against a different set.
 
-A fresh clone has no such file and will raise on import. Give it one:
-
-```bash
-cp data/leads.example.tsv data/leads.tsv   # then fill in the real values
-# or keep it outside the repo:
-export TGCPL_LEADS=/path/to/leads.tsv
-```
-
-`data/leads.example.tsv` documents the columns and ships placeholder rows
-(benzene, toluene) so the package imports and the tests run without any real
-data present.
-
-**This applies on the cluster too** — `git pull` will not bring the file, so
-copy it across once:
-
-```bash
-scp data/leads.tsv greatlakes:$TGCPL_DIR/TgCPL/
-```
+`data/leads.example.tsv` documents the columns and carries placeholder rows.
 
 Lead names used on the command line (`--ref-smiles Cpd12`) are the `name`
 column; `python scripts/tgcpl/tgcpl_generate.py --help` lists what loaded.

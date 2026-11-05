@@ -1,9 +1,7 @@
 """
-Reference lead molecules, loaded from a TSV that git does not track.
+Reference lead molecules, loaded from data/leads.tsv.
 
-Structures and assay values stay out of the repo. Point TGCPL_LEADS at the
-file, or leave it at the default data/leads.tsv. See data/leads.example.tsv
-for the columns.
+TGCPL_LEADS overrides the path. See data/leads.example.tsv for the columns.
 
 Shared pharmacophore: P1 morpholine on the triazine, P2 basic chain off the
 acyclic triazine nitrogen, P3 arylmethyl/cycloalkyl on that same nitrogen.
@@ -38,8 +36,8 @@ def load_leads(path: Path | None = None) -> dict[str, dict]:
     if not path.is_file():
         raise FileNotFoundError(
             f"leads file not found: {path}\n"
-            f"It is gitignored, so a fresh clone has to be given one. Copy it "
-            f"in, or set TGCPL_LEADS. Columns are in data/leads.example.tsv."
+            f"Expected it in the repo; set TGCPL_LEADS to use another. "
+            f"Columns are in data/leads.example.tsv."
         )
     rows = [
         ln for ln in path.read_text().splitlines()

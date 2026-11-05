@@ -9,9 +9,6 @@ tgcpl_outputs/
 __pycache__/
 *.pyc
 
-# Lead structures and assay values — kept out of the repo.
-data/leads.tsv
-data/lead_molecules.smi
 
 # OneDrive recreates this as empty stubs after the rename to data/.
-TgCPL/
+/TgCPL/

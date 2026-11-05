@@ -1,0 +1,7 @@
+# Reference leads. NOT tracked by git -- see leads.example.tsv.
+# Potency: experimental readouts, 10 ** mean_log_ic50(uM) * 1000.
+name	vmcc	smiles	tgcpl_ic50_nM	hscpl_ic50_nM	selectivity	note
+Cpd1	VMCC-0000178	CCN(CC)CCN(Cc1ccc(F)cc1)c1nc(C#N)nc(N2CCOCC2)n1	222.0	3600.6	16.22	Parent compound; no benzylic substituent
+Cpd12	VMCC-0005199	CCN(CC)CCN(c1nc(C#N)nc(N2CCOCC2)n1)C(c1ccc(F)cc1)C1CCCCC1	557.6	18515.0	33.21	Cyclohexyl benzylic; best single-SAR compound
+Cpd13	VMCC-0005223	CCN(CC)CCN(c1nc(C#N)nc(N2CCOCC2)n1)C(c1ccc(F)cc1)C1CCCCCC1	496.8	19695.0	39.65	Cycloheptyl benzylic; best selectivity overall
+Cpd18	VMCC-0005222	N#Cc1nc(N2CCOCC2)nc(N(CCC2CCNCC2)C(c2ccc(F)cc2)C2CCCCC2)n1	207.1	6845.5	33.05	Best potency + high selectivity; piperidinylethyl P2
