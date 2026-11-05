@@ -219,6 +219,16 @@ def test_filter_io() -> None:
 def test_generation(device: str) -> None:
     section(f"6. live 2-sample generation on {device} (slow)")
 
+    # Login nodes have no GPU; without this the failure surfaces as a torch
+    # deserialization error that reads like a broken install.
+    if device == "cuda":
+        import torch
+        if not torch.cuda.is_available():
+            print("  SKIP: --device cuda but no GPU visible. You are probably on\n"
+                  "        a login node -- get one with salloc, or submit\n"
+                  "        tests/greatlakes_smoke_test.sh instead.")
+            return
+
     for core in ("warhead_p2n", "warhead_morpholine_p2n"):
         with tempfile.TemporaryDirectory() as td:
             cmd = [
