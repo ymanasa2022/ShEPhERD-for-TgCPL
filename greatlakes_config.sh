@@ -24,14 +24,15 @@ REPO_DIR="$TURBO/opt/shepherd2"
 # This repo: tgcpl_generate.py, filter_generated.py, the tgcpl/ package.
 TGCPL_DIR="$TURBO/campaigns/tgcpl-martin-campaign/scripts/ShEPhERD-for-TgCPL"
 
-# Conda env (--prefix, not a named env).
+# Conda env (--prefix, not a named env). Deliberately on Turbo rather than
+# scratch: scratch is purged after ~60 days untouched, and an env is thousands
+# of files that nothing "touches" in the sense that policy means, so losing it
+# costs a ~15 min torch/CUDA reinstall.
 #
-# NOTE: this sits on scratch, so a purge takes the whole env with it --
-# thousands of files that nothing "touches" in the sense the purge policy
-# means. Reinstalling is a ~15 min torch/CUDA download. If that bites, move
-# this to "$TURBO/envs/shepherd2" and re-run greatlakes_setup.sh; nothing else
-# needs changing.
-ENV_PREFIX="$SCRATCH/envs/shepherd2"
+# The enclosing directory name is incidental. conda, mamba and micromamba all
+# write the same env format, and `conda activate <absolute prefix>` works on
+# any of them regardless of which tool created it.
+ENV_PREFIX="$TURBO/micromamba/envs/shepherd2"
 
 # Generated molecules. Large and reproducible, so scratch is the right home.
 OUTPUT_ROOT="$SCRATCH/SHEP_out"

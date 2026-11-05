@@ -10,22 +10,21 @@ Work is split across two filesystems:
 # Turbo — persistent. Anything expensive to rebuild.
 /home/ymanasa/turbo/ymanasa/
 ├── miniconda3/                         # conda install (CONDA_SH)
+├── micromamba/envs/shepherd2/          # ENV_PREFIX: the env itself
 ├── opt/shepherd2/                      # upstream coleygroup/shepherd2
 └── campaigns/tgcpl-martin-campaign/scripts/ShEPhERD-for-TgCPL/   # this repo
 
 # Scratch — large, regenerable, and PURGED after ~60 days untouched.
 /scratch/maom_root/maom0/$USER/tgcpl-scratch-campaign/
-├── envs/shepherd2/                     # conda env (--prefix, not named)
 ├── SHEP_out/                           # OUTPUT_ROOT: generated molecules
 ├── intermediate_data/shep_hf_cache/    # HF_HOME: model checkpoints
 └── logs/
 ```
 
-> **Purge warning.** The conda env sits on scratch, so a purge deletes it —
-> thousands of files nothing "touches" in the sense the policy means.
-> Rebuilding is a ~15 min torch/CUDA download. To avoid that, set
-> `ENV_PREFIX="$TURBO/envs/shepherd2"` in `greatlakes_config.sh` and re-run
-> setup; nothing else changes.
+The env lives on Turbo on purpose: it is thousands of files that nothing
+"touches" in the sense the purge policy means, so on scratch it would quietly
+vanish and cost a ~15 min torch/CUDA reinstall. Only regenerable output sits on
+scratch.
 
 ## 1. Get the code there
 
