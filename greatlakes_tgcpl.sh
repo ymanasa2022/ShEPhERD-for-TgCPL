@@ -96,6 +96,41 @@ case "$SLURM_ARRAY_TASK_ID" in
           --seed 42
       ;;
 
+  6)  # SUPERSEDED by greatlakes_redesign.sh (4-run 2x2 at MW<=500). Kept only
+      # so an old `sbatch --array=6` does not silently vanish.
+      echo "run6 moved: use  sbatch --array=1-4 greatlakes_redesign.sh"; exit 1
+      ;;
+
+  99) # VMCC-0005199 (= Cpd12) three-point redesign, under a 400 Da ceiling.
+      #
+      # Pins the warhead + the P2 nitrogen only, so the P1 morpholine and BOTH
+      # groups on that nitrogen (benzylic aryl/cycloalkyl and the basic chain)
+      # are regenerated.
+      #
+      # The negative --add-atoms-range is the MW lever: Cpd12 embeds to 74 atoms
+      # incl. H, and this series runs ~6.7 Da/atom, so N_x1 57-63 targets the
+      # 380-420 Da band. Without it N_x1 defaults to the reference's 74 and
+      # generation lands near 495 Da, nowhere near the ceiling. Note the flag
+      # was written for GROWING; negatives are arithmetically fine but
+      # unexercised, so run this once at --n-samples 2 before the full job.
+      #
+      # Pass the two values space-separated. "--add-atoms-range=-17 -11" does
+      # NOT parse; argparse needs "--add-atoms-range -17 -11".
+      echo ">>> run6: VMCC-0005199/Cpd12, P1+P2+P3 free, N_x1 57-63, 150 samples"
+      python tgcpl_generate.py \
+          --ref-smiles Cpd12 \
+          --n-samples 150 \
+          --batch-size 25 \
+          --condition all \
+          --scaffold-constraint \
+          --scaffold-core warhead_p2n \
+          --add-atoms-range -17 -11 \
+          --output-dir "$OUTPUT_ROOT/run6_vmcc5199_mw400" \
+          --seed 42
+      python filter_generated.py "$OUTPUT_ROOT/run6_vmcc5199_mw400" \
+          --max-mw 400 --max-rotb 7 --max-ring-size 7
+      ;;
+
   *)  echo "ERROR: unknown array index $SLURM_ARRAY_TASK_ID"; exit 1 ;;
 esac
 
