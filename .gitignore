@@ -8,3 +8,7 @@ tgcpl_outputs/
 
 __pycache__/
 *.pyc
+
+# Lead structures and assay values — kept out of the repo.
+TgCPL/leads.tsv
+TgCPL/lead_molecules.smi

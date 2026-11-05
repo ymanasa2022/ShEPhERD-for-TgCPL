@@ -249,22 +249,37 @@ react.
 
 ---
 
-## Lead molecule reference
+## Lead molecules
 
-Structures, registry ids and assay values are deliberately **not** in this
-repo's documentation. They live in:
+Structures and assay values are **not tracked by git**. `scripts/tgcpl/leads.py`
+loads them at import from `TgCPL/leads.tsv`, which is gitignored.
 
-| what | where |
-|------|-------|
-| SMILES + potency for every lead | `TgCPL/lead_molecules.smi` |
-| the dict the code actually reads | `scripts/tgcpl/leads.py` |
-| raw assay readouts | `Data/records/experiment_readouts.csv` (outside this repo) |
-| computed properties + registry ids | `Data/records/metadata.csv` (outside this repo) |
+A fresh clone has no such file and will raise on import. Give it one:
 
-Lead names used on the command line (`--ref-smiles Cpd12`) are the keys of
-`LEADS` in `scripts/tgcpl/leads.py`; `python scripts/tgcpl/tgcpl_generate.py --help`
-lists the valid ones. Run directories are named by registry id, resolved at
-runtime from that same table, so nothing has to be written down here.
+```bash
+cp TgCPL/leads.example.tsv TgCPL/leads.tsv   # then fill in the real values
+# or keep it outside the repo:
+export TGCPL_LEADS=/path/to/leads.tsv
+```
+
+`TgCPL/leads.example.tsv` documents the columns and ships placeholder rows
+(benzene, toluene) so the package imports and the tests run without any real
+data present.
+
+**This applies on the cluster too** — `git pull` will not bring the file, so
+copy it across once:
+
+```bash
+scp TgCPL/leads.tsv greatlakes:$TGCPL_DIR/TgCPL/
+```
+
+Lead names used on the command line (`--ref-smiles Cpd12`) are the `name`
+column; `python scripts/tgcpl/tgcpl_generate.py --help` lists what loaded.
+Run directories are named by `vmcc`, so output joins back to the assay records.
+
+Raw data lives outside this repo in `Data/records/` —
+`experiment_readouts.csv` (assay values) and `metadata.csv` (computed
+properties, registry ids).
 
 Warhead: reversible covalent nitrile → Cys31 (TgCPL) / Cys25 (HsCPL)  
 Crystal structures: TgCPL = PDB 3F75 | HsCPL = PDB 5MAJ

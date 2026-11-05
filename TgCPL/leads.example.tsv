@@ -1,0 +1,21 @@
+# Template for TgCPL/leads.tsv, which git does not track.
+#
+# Copy to leads.tsv and fill in the real structures and assay values:
+#   cp TgCPL/leads.example.tsv TgCPL/leads.tsv
+# Or point TGCPL_LEADS at a file kept elsewhere.
+#
+# Tab-separated. Blank lines and '#' lines are ignored.
+#
+#   name            key for --ref-smiles, e.g. Cpd12
+#   vmcc            registry substance_id; names run directories
+#   smiles          structure
+#   tgcpl_ic50_nM   on-target potency, nM
+#   hscpl_ic50_nM   off-target potency, nM
+#   selectivity     hscpl / tgcpl
+#   note            free text, shown in --help
+#
+# The rows below are PLACEHOLDERS: benzene and toluene, so a fresh clone
+# imports and the tests run. They are not inhibitors. Replace them.
+name	vmcc	smiles	tgcpl_ic50_nM	hscpl_ic50_nM	selectivity	note
+Example1	EXAMPLE-0000001	c1ccccc1	1000.0	10000.0	10.0	PLACEHOLDER -- replace
+Example2	EXAMPLE-0000002	Cc1ccccc1	500.0	10000.0	20.0	PLACEHOLDER -- replace
