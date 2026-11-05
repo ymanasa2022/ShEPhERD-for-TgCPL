@@ -41,7 +41,6 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import os
 import pickle
 import time
 from pathlib import Path
@@ -49,111 +48,27 @@ from pathlib import Path
 import numpy as np
 import torch
 from rdkit import Chem
-from rdkit.Chem import AllChem
 
 from shepherd import load_model
 from shepherd.comp_inference.utils import align_two_ref_mol_from_mol_charge
 from shepherd.extract import mol_charges_from_samples
 from shepherd.interaction_profile import extract_interaction_profile, ConditionAtoms
-from shepherd_score.conformer_generation import embed_conformer_from_smiles
 
 torch.set_float32_matmul_precision("high")
 
 # ---------------------------------------------------------------------------
-# Lead molecules from TgCPL Draft 6
+# Shared definitions now live in the tgcpl package. They are re-exported here
+# because summarize_run.py and baseline_scores.py import them from this module.
 # ---------------------------------------------------------------------------
-LEADS = {
-    "Cpd1": {
-        "smiles": "CCN(CC)CCN(Cc1ccc(F)cc1)c1nc(C#N)nc(N2CCOCC2)n1",
-        "vmcc": "VMCC-0000178",
-        "tgcpl_ic50_nM": 320,
-        "hscpl_ic50_nM": 2240,
-        "selectivity": 7.0,
-        "note": "Parent compound; no benzylic substituent",
-    },
-    "Cpd12": {
-        "smiles": "CCN(CC)CCN(c1nc(C#N)nc(N2CCOCC2)n1)C(c1ccc(F)cc1)C1CCCCC1",
-        "vmcc": "VMCC-0005199",
-        "tgcpl_ic50_nM": 629,
-        "hscpl_ic50_nM": 23245,
-        "selectivity": 36.9,
-        "note": "Cyclohexyl benzylic; best single-SAR compound",
-    },
-    "Cpd13": {
-        "smiles": "CCN(CC)CCN(c1nc(C#N)nc(N2CCOCC2)n1)C(c1ccc(F)cc1)C1CCCCCC1",
-        "vmcc": "VMCC-0005223",
-        "tgcpl_ic50_nM": 497,
-        "hscpl_ic50_nM": 19695,
-        "selectivity": 39.6,
-        "note": "Cycloheptyl benzylic; best selectivity overall",
-    },
-    "Cpd18": {
-        "smiles": "N#Cc1nc(N2CCOCC2)nc(N(CCC2CCNCC2)C(c2ccc(F)cc2)C2CCCCC2)n1",
-        "vmcc": "VMCC-0005222",
-        "tgcpl_ic50_nM": 210,
-        "hscpl_ic50_nM": 8080,
-        "selectivity": 38.5,
-        "note": "Best potency + high selectivity; piperidinylethyl P2",
-    },
-}
-
-# Scaffold cores for --scaffold-constraint, smallest first.
-#
-# "warhead" is just the covalent nitrile and the triazine it hangs off: the part
-# that is mechanistically required, since the C#N is what reacts with the
-# catalytic cysteine. Everything else — including the morpholine at P1 — is left
-# for ShEPhERD to rebuild, so S1 is explorable.
-#
-# "warhead_morpholine" additionally fixes the P1 morpholine. On Cpd18 that is 14
-# of 37 heavy atoms versus 8, so it leaves markedly less room to generate into.
-#
-# Caveat for "warhead": the nitrile's electrophilicity depends on how electron
-# -poor the triazine is, which the P1 substituent tunes. Replacing morpholine
-# changes covalent reactivity, so generated analogues need a reactivity check,
-# not just a shape score.
-# "warhead_p2n" pins the warhead PLUS the P2 nitrogen itself -- the acyclic N
-# joining the triazine to the benzylic group and the basic chain -- and nothing
-# else. The P1 morpholine and BOTH substituents on that nitrogen are left free,
-# so generation explores P1, P2 and P3 while the attachment point stays put.
-# 9 heavy atoms (~121 Da), the roomiest of the three cores.
-#
-# The [N;!R] is load-bearing. Written as plain N the pattern matches Cpd12 TWICE
-# -- the exocyclic N can map to either the P2 nitrogen or the morpholine
-# nitrogen -- and get_scaffold_atom_indices takes matches[0], which is the
-# morpholine one, pinning exactly the group we wanted to vary. Requiring
-# not-in-ring selects the acyclic P2 nitrogen uniquely on both Cpd12 and Cpd18.
-SCAFFOLD_CORES = {
-    "warhead": "N#Cc1ncncn1",
-    "warhead_morpholine": "N#Cc1nc(N2CCOCC2)ncn1",
-    "warhead_p2n": "N#Cc1ncnc([N;!R])n1",
-    # As warhead_p2n, but ALSO pins the P1 morpholine (15 atoms, ~206 Da). Use
-    # this for the "keep the morpholine" arm of a paired run: only the two
-    # groups on the P2 nitrogen are regenerated. Pair it with warhead_p2n,
-    # which is the identical design with morpholine left free, so the pair
-    # isolates the effect of replacing P1.
-    "warhead_morpholine_p2n": "N#Cc1nc(N2CCOCC2)nc([N;!R])n1",
-}
-
-# Back-compat alias; previously the only core.
-TRIAZINE_CORE_SMARTS = SCAFFOLD_CORES["warhead_morpholine"]
-
-
-def embed_lead(smiles: str, seed: int = 42) -> Chem.Mol | None:
-    """Embed lead SMILES as an xTB-relaxed 3D conformer with explicit H."""
-    mol = embed_conformer_from_smiles(smiles, MMFF_optimize=True, random_seed=seed)
-    return mol
-
-
-def get_scaffold_atom_indices(mol: Chem.Mol, core: str = "warhead_morpholine") -> list[int]:
-    """Return atom indices matching the chosen scaffold core (see SCAFFOLD_CORES)."""
-    core_query = Chem.MolFromSmarts(SCAFFOLD_CORES[core])
-    if core_query is None:
-        return []
-    matches = mol.GetSubstructMatches(core_query, useChirality=False)
-    if not matches:
-        return []
-    # Flatten all matches (take first if multiple)
-    return list(matches[0])
+from tgcpl.conformers import embed_lead                       # noqa: E402,F401
+from tgcpl.leads import LEADS, lead_names, registry_id        # noqa: E402,F401
+from tgcpl.scaffolds import (                                 # noqa: E402,F401
+    DEFAULT_CORE,
+    SCAFFOLD_CORES,
+    TRIAZINE_CORE_SMARTS,
+    core_names,
+    get_scaffold_atom_indices,
+)
 
 
 def run_generation(

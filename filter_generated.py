@@ -33,68 +33,17 @@ import sys
 from pathlib import Path
 
 from rdkit import Chem, RDLogger
-from rdkit.Chem import Crippen, Descriptors, QED, rdMolDescriptors as rdmd
-from rdkit.Chem.FilterCatalog import FilterCatalog, FilterCatalogParams
+
+from tgcpl.properties import (
+    DEFAULT_THRESHOLDS,
+    describe,
+    pains_catalog,
+    reasons_to_reject,
+)
 
 RDLogger.DisableLog("rdApp.*")
 
-# Mechanism-critical substructures. The nitrile is what forms the reversible
-# covalent bond to Cys31; lose it and the molecule is not this chemotype.
-NITRILE = Chem.MolFromSmarts("C#N")
-TRIAZINE = Chem.MolFromSmarts("c1ncncn1")
-
-
-def _pains_catalog() -> FilterCatalog:
-    params = FilterCatalogParams()
-    params.AddCatalog(FilterCatalogParams.FilterCatalogs.PAINS)
-    return FilterCatalog(params)
-
-
-def max_ring_size(mol: Chem.Mol) -> int:
-    rings = mol.GetRingInfo().AtomRings()
-    return max((len(r) for r in rings), default=0)
-
-
-def describe(mol: Chem.Mol) -> dict:
-    return {
-        "mw": Descriptors.MolWt(mol),
-        "logp": Crippen.MolLogP(mol),
-        "tpsa": rdmd.CalcTPSA(mol),
-        "hbd": rdmd.CalcNumHBD(mol),
-        "hba": rdmd.CalcNumHBA(mol),
-        "rotb": rdmd.CalcNumRotatableBonds(mol),
-        "qed": QED.qed(mol),
-        "rings": rdmd.CalcNumRings(mol),
-        "max_ring": max_ring_size(mol),
-        "fsp3": rdmd.CalcFractionCSP3(mol),
-        "heavy": mol.GetNumHeavyAtoms(),
-    }
-
-
-def reasons_to_reject(mol: Chem.Mol, d: dict, a: argparse.Namespace,
-                      pains: FilterCatalog | None) -> list[str]:
-    out = []
-    if a.require_warhead and not mol.HasSubstructMatch(NITRILE):
-        out.append("no-nitrile")
-    if a.require_triazine and not mol.HasSubstructMatch(TRIAZINE):
-        out.append("no-triazine")
-    if d["mw"] > a.max_mw:
-        out.append(f"MW>{a.max_mw:g}")
-    if d["rotb"] > a.max_rotb:
-        out.append(f"rotB>{a.max_rotb}")
-    if d["max_ring"] > a.max_ring_size:
-        out.append(f"ring{d['max_ring']}>{a.max_ring_size}")
-    if d["logp"] > a.max_logp:
-        out.append(f"logP>{a.max_logp:g}")
-    if d["hbd"] > a.max_hbd:
-        out.append(f"HBD>{a.max_hbd}")
-    if d["hba"] > a.max_hba:
-        out.append(f"HBA>{a.max_hba}")
-    if d["tpsa"] > a.max_tpsa:
-        out.append(f"TPSA>{a.max_tpsa:g}")
-    if pains is not None and pains.HasMatch(mol):
-        out.append("PAINS")
-    return out
+_D = DEFAULT_THRESHOLDS
 
 
 def collect_sdfs(target: Path) -> list[Path]:
@@ -110,15 +59,15 @@ def main() -> None:
     )
     ap.add_argument("target", type=Path,
                     help="A tgcpl_generate.py --output-dir, or a single .sdf")
-    ap.add_argument("--max-mw", type=float, default=400.0)
-    ap.add_argument("--max-rotb", type=int, default=7)
-    ap.add_argument("--max-ring-size", type=int, default=7,
+    ap.add_argument("--max-mw", type=float, default=_D["max_mw"])
+    ap.add_argument("--max-rotb", type=int, default=_D["max_rotb"])
+    ap.add_argument("--max-ring-size", type=int, default=_D["max_ring_size"],
                     help="Largest allowed ring. 7 keeps cycloheptyl (Cpd13) and "
                          "rejects macrocycles")
-    ap.add_argument("--max-logp", type=float, default=5.0)
-    ap.add_argument("--max-hbd", type=int, default=5)
-    ap.add_argument("--max-hba", type=int, default=10)
-    ap.add_argument("--max-tpsa", type=float, default=140.0,
+    ap.add_argument("--max-logp", type=float, default=_D["max_logp"])
+    ap.add_argument("--max-hbd", type=int, default=_D["max_hbd"])
+    ap.add_argument("--max-hba", type=int, default=_D["max_hba"])
+    ap.add_argument("--max-tpsa", type=float, default=_D["max_tpsa"],
                     help="Veber oral-absorption ceiling")
     ap.add_argument("--no-warhead-check", dest="require_warhead",
                     action="store_false")
@@ -138,7 +87,7 @@ def main() -> None:
     if not sdfs:
         sys.exit(f"No generated_molecules.sdf found under {args.target}")
 
-    pains = _pains_catalog() if args.pains else None
+    pains = pains_catalog() if args.pains else None
 
     # ---- load + dedupe -----------------------------------------------------
     seen: dict[str, Chem.Mol] = {}
