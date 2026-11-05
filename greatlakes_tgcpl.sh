@@ -9,7 +9,7 @@
 # cost the others, and each gets the full wall clock rather than sharing it.
 # =============================================================================
 #SBATCH --job-name=tgcpl_gen
-#SBATCH --account=maom99
+#SBATCH --account=maom0          # must match your Slurm account: run `my_accounts`
 #SBATCH --partition=gpu
 #SBATCH --gpus=1
 #SBATCH --nodes=1

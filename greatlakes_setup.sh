@@ -3,44 +3,47 @@
 # greatlakes_setup.sh — install ShEPhERD-2 on U-M Great Lakes
 #
 # Run ONCE, on a login node (not via sbatch):
-#   bash greatlakes_setup.sh
+#   bash greatlakes_setup.sh            # default CUDA build
+#   bash greatlakes_setup.sh cu124      # pick another
 #
-# Installs into /scratch so the ~80 GB home quota is not consumed by the
-# conda env, the PyTorch wheels, or the downloaded model checkpoints.
+# Idempotent: pulls instead of re-cloning, skips env creation if the prefix
+# exists, so it is safe to re-run after a failure.
+#
+# Paths live in greatlakes_config.sh; edit them there, not here.
 # =============================================================================
 
 set -euo pipefail
 
-ACCOUNT="maom99"
-UNIQNAME="$(whoami)"
-SCRATCH="/scratch/${ACCOUNT}_root/${ACCOUNT}/${UNIQNAME}"
-REPO_DIR="$SCRATCH/shepherd2"
-ENV_PREFIX="$SCRATCH/envs/shepherd2"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/greatlakes_config.sh"
+
 CUDA_EXTRA="${1:-cu126}"   # cu118 | cu124 | cu126 | cu128 | cu130
 
 echo "=== ShEPhERD-2 setup on Great Lakes ==="
+echo "    turbo   : $TURBO"
 echo "    scratch : $SCRATCH"
 echo "    repo    : $REPO_DIR"
+echo "    tgcpl   : $TGCPL_DIR"
 echo "    env     : $ENV_PREFIX"
+echo "    hf_home : $HF_HOME"
 echo "    torch   : $CUDA_EXTRA"
 echo
 
-if [ ! -d "$SCRATCH" ]; then
-    echo "ERROR: $SCRATCH does not exist."
-    echo "Check your scratch path with:  ls /scratch/${ACCOUNT}_root/${ACCOUNT}/"
+# --- 0. preconditions ------------------------------------------------------
+# --pre-install skips the ENV_PREFIX check: creating it is this script's job.
+if ! tgcpl_check_paths --pre-install; then
+    echo
+    echo "Fix the paths in greatlakes_config.sh before continuing." >&2
     exit 1
 fi
 
-mkdir -p "$SCRATCH/envs" "$SCRATCH/hf_cache" "$SCRATCH/logs"
+mkdir -p "$SCRATCH" "$(dirname "$ENV_PREFIX")" "$HF_HOME" "$SCRATCH/logs"
 
 # --- 1. conda --------------------------------------------------------------
-# Great Lakes provides Anaconda via Lmod. `module load` is how you get conda
-# onto PATH; `conda activate` additionally needs the shell hook sourced.
-module load python3.11-anaconda 2>/dev/null \
-  || module load anaconda 2>/dev/null \
-  || { echo "ERROR: no anaconda module found. Run 'module avail anaconda' and edit this line."; exit 1; }
-
-source "$(conda info --base)/etc/profile.d/conda.sh"
+# Sourced from CONDA_SH rather than `module load` + `conda info --base`: the
+# inherited CONDA_EXE points at a mount path that no longer exists, so the
+# conda shell function fails on activate. See greatlakes_config.sh.
+source "$CONDA_SH"
 
 # --- 2. repo ---------------------------------------------------------------
 if [ -d "$REPO_DIR/.git" ]; then
@@ -48,11 +51,15 @@ if [ -d "$REPO_DIR/.git" ]; then
     git -C "$REPO_DIR" pull --ff-only
 else
     echo "[1/4] Cloning shepherd2..."
+    mkdir -p "$(dirname "$REPO_DIR")"
     git clone https://github.com/coleygroup/shepherd2.git "$REPO_DIR"
 fi
 
 # --- 3. environment --------------------------------------------------------
-# Built at an explicit --prefix in scratch rather than a named env in $HOME.
+# Built at an explicit --prefix rather than a named env, so it lands exactly
+# where greatlakes_config.sh says. python<3.12 is a hard requirement of the
+# shepherd package; 3.12 fails at metadata resolution with
+# "requires a different Python".
 if [ -d "$ENV_PREFIX" ]; then
     echo "[2/4] Env exists at $ENV_PREFIX — skipping create."
 else
@@ -61,6 +68,18 @@ else
 fi
 
 conda activate "$ENV_PREFIX"
+
+# Guard against installing into the wrong interpreter. If activation silently
+# failed, pip would fall back to a user install under ~/.local and scatter
+# torch across the home quota.
+_py_prefix="$(python -c 'import sys; print(sys.prefix)')"
+if [ "$_py_prefix" != "$ENV_PREFIX" ]; then
+    echo "ERROR: activate did not take." >&2
+    echo "  expected sys.prefix $ENV_PREFIX" >&2
+    echo "  got               $_py_prefix" >&2
+    exit 1
+fi
+echo "      active python: $(python -V 2>&1) at $_py_prefix"
 
 # --- 4. shepherd2 ----------------------------------------------------------
 echo "[3/4] Installing shepherd2 [$CUDA_EXTRA]..."
@@ -72,9 +91,10 @@ uv pip install -e ".[${CUDA_EXTRA}]"
 # --- 5. verify -------------------------------------------------------------
 echo "[4/4] Verifying..."
 python - <<'PY'
-import shutil, torch
+import shutil, sys, torch
 from shepherd import load_model
 from shepherd_score.conformer_generation import embed_conformer_from_smiles
+print("python       :", sys.version.split()[0])
 print("torch        :", torch.__version__)
 print("torch.cuda   :", torch.version.cuda)
 print("xtb on PATH  :", shutil.which("xtb") or "*** MISSING ***")
@@ -88,10 +108,11 @@ cat <<EOF
 
 === Done ===
 
-Activate in a job script with:
-    module load python3.11-anaconda
-    source \$(conda info --base)/etc/profile.d/conda.sh
-    conda activate $ENV_PREFIX
+Job scripts activate this themselves via greatlakes_env.sh. To activate by
+hand:
+    source $SCRIPT_DIR/greatlakes_env.sh
 
-Next:  sbatch greatlakes_smoke_test.sh
+Next:
+    python $TGCPL_DIR/tests/test_redesign.py     # fast, no GPU
+    sbatch $SCRIPT_DIR/greatlakes_smoke_test.sh  # checks the GPU
 EOF

@@ -1,28 +1,36 @@
 #!/usr/bin/env bash
 # =============================================================================
-# greatlakes_env.sh — shared environment setup, sourced by every job script.
+# greatlakes_env.sh — activate the environment. Sourced by every job script.
 #   source greatlakes_env.sh
-# Edit paths here once; all job scripts follow.
+#
+# Paths live in greatlakes_config.sh; edit them there, not here.
 # =============================================================================
 
-ACCOUNT="maom99"
-UNIQNAME="$(whoami)"
-SCRATCH="/scratch/${ACCOUNT}_root/${ACCOUNT}/${UNIQNAME}"
+_GL_ENV_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$_GL_ENV_DIR/greatlakes_config.sh"
 
-REPO_DIR="$SCRATCH/shepherd2"
-ENV_PREFIX="$SCRATCH/envs/shepherd2"
-TGCPL_DIR="$SCRATCH/ShEPhERD-for-TgCPL"
-OUTPUT_ROOT="$SCRATCH/tgcpl_outputs"
+if ! tgcpl_check_paths; then
+    echo "greatlakes_env.sh: environment is not set up as configured." >&2
+    echo "  Check greatlakes_config.sh, or run: bash greatlakes_setup.sh" >&2
+    return 1 2>/dev/null || exit 1
+fi
 
-# Keep the HF checkpoint download out of the home quota.
-export HF_HOME="$SCRATCH/hf_cache"
-
-module load python3.11-anaconda 2>/dev/null || module load anaconda 2>/dev/null
-source "$(conda info --base)/etc/profile.d/conda.sh"
+# Source the hook explicitly. Deriving it from `conda info --base` picks up
+# whatever conda is on PATH, which in a batch job is not necessarily the one
+# holding ENV_PREFIX -- see the CONDA_SH note in greatlakes_config.sh.
+source "$CONDA_SH"
 conda activate "$ENV_PREFIX"
+
+# Activating is what puts `xtb` on PATH. Without it generation dies partway in
+# with FileNotFoundError: 'xtb', after the model has already loaded.
+if ! command -v xtb >/dev/null; then
+    echo "greatlakes_env.sh: xtb not on PATH after activating $ENV_PREFIX" >&2
+    echo "  The env is missing its conda-forge xtb package." >&2
+    return 1 2>/dev/null || exit 1
+fi
 
 # xtb spawns threads per worker; let Slurm's CPU allocation govern.
 export OMP_NUM_THREADS=1
 export MKL_NUM_THREADS=1
 
-mkdir -p "$OUTPUT_ROOT" "$SCRATCH/logs"
+mkdir -p "$OUTPUT_ROOT" "$HF_HOME" "$SCRATCH/logs"

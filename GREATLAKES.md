@@ -1,32 +1,57 @@
 # Running TgCPL ShEPhERD-2 on U-M Great Lakes
 
-Account: `maom99`. Everything lives in scratch, not home — the conda env, the
-PyTorch wheels and the HF checkpoints together are far too large for the home
-quota.
+Account: `maom`. **All paths live in `greatlakes_config.sh`** — that is the one
+file to edit, and both the setup script and every job script source it. Nothing
+else hardcodes a path.
+
+Work is split across two filesystems:
 
 ```
-/scratch/maom99_root/maom99/$USER/
-├── shepherd2/              # cloned repo
-├── envs/shepherd2/         # conda env (--prefix, not a named env)
-├── hf_cache/               # HF_HOME: downloaded checkpoints
-├── ShEPhERD-for-TgCPL/     # these scripts + tgcpl_generate.py
-└── tgcpl_outputs/          # results
+# Turbo — persistent. Anything expensive to rebuild.
+/home/ymanasa/turbo/ymanasa/
+├── miniconda3/                         # conda install (CONDA_SH)
+├── opt/shepherd2/                      # upstream coleygroup/shepherd2
+└── campaigns/tgcpl-martin-campaign/scripts/ShEPhERD-for-TgCPL/   # this repo
+
+# Scratch — large, regenerable, and PURGED after ~60 days untouched.
+/scratch/maom_root/maom0/$USER/tgcpl-scratch-campaign/
+├── envs/shepherd2/                     # conda env (--prefix, not named)
+├── SHEP_out/                           # OUTPUT_ROOT: generated molecules
+├── intermediate_data/shep_hf_cache/    # HF_HOME: model checkpoints
+└── logs/
 ```
 
-## 1. Upload
+> **Purge warning.** The conda env sits on scratch, so a purge deletes it —
+> thousands of files nothing "touches" in the sense the policy means.
+> Rebuilding is a ~15 min torch/CUDA download. To avoid that, set
+> `ENV_PREFIX="$TURBO/envs/shepherd2"` in `greatlakes_config.sh` and re-run
+> setup; nothing else changes.
+
+## 1. Get the code there
 
 ```bash
-SCRATCH=/scratch/maom99_root/maom99/$USER
-rsync -av ~/path/to/ShEPhERD-for-TgCPL/ uniqname@greatlakes.arc-ts.umich.edu:$SCRATCH/ShEPhERD-for-TgCPL/
+git clone https://github.com/ymanasa2022/ShEPhERD-for-TgCPL.git \
+    /home/ymanasa/turbo/ymanasa/campaigns/tgcpl-martin-campaign/scripts/ShEPhERD-for-TgCPL
+# already cloned? just:  git pull
 ```
 
 ## 2. Install (login node, once, ~15 min)
 
 ```bash
-ssh uniqname@greatlakes.arc-ts.umich.edu
-cd /scratch/maom99_root/maom99/$USER/ShEPhERD-for-TgCPL
+ssh greatlakes
+cd /home/ymanasa/turbo/ymanasa/campaigns/tgcpl-martin-campaign/scripts/ShEPhERD-for-TgCPL
 bash greatlakes_setup.sh cu126      # or cu124 / cu128 — see note below
 ```
+
+Setup validates every configured path first and refuses to continue if one is
+missing, rather than failing partway through. It also verifies that
+`conda activate` actually took before installing — otherwise pip silently falls
+back to a user install and scatters torch through your home quota.
+
+Two things that will bite if changed: the env must be **Python 3.11**
+(`shepherd` requires `>=3.11,<3.12`; 3.12 fails at metadata resolution), and
+`xtb` must come from conda-forge — generation dies partway with
+`FileNotFoundError: 'xtb'` without it.
 
 ## 3. Smoke test (one 30-min GPU job)
 
@@ -70,11 +95,15 @@ scancel <jobid>
 
 These are the parts I could not check from your laptop:
 
-1. **Scratch path.** `ls /scratch/maom99_root/maom99/` — if your directory is
-   not `$USER`, edit `SCRATCH` in `greatlakes_env.sh` and `greatlakes_setup.sh`.
-2. **Anaconda module name.** `module avail anaconda`. The scripts try
-   `python3.11-anaconda` then `anaconda`; if yours differs, edit the
-   `module load` line in `greatlakes_env.sh` and `greatlakes_setup.sh`.
+1. **Slurm account.** Run `my_accounts`. The `#SBATCH --account=` line in
+   `greatlakes_redesign.sh`, `greatlakes_tgcpl.sh` and
+   `greatlakes_smoke_test.sh` must match it exactly or sbatch refuses the job.
+   These are `#SBATCH` directives, parsed before the shell runs, so they
+   **cannot** read `$ACCOUNT` from `greatlakes_config.sh` — they are the one
+   place a value is duplicated. `maom0` is inferred from the scratch path
+   (`/scratch/maom_root/maom0/...`); verify it.
+2. **Paths.** `bash -c 'source greatlakes_config.sh && tgcpl_check_paths'`
+   prints anything missing. Everything else reads from that one file.
 3. **CUDA version.** `nvidia-smi` on a GPU node shows the driver's CUDA. Pick
    the `cu*` extra at or below it. Great Lakes `gpu` partition has V100s;
    `spgpu` has newer A40s — `--partition=spgpu` may queue faster.
@@ -83,10 +112,17 @@ These are the parts I could not check from your laptop:
 
 ## Notes
 
-- `conda activate` needs `source $(conda info --base)/etc/profile.d/conda.sh`
-  first in a batch job — a non-interactive shell has no conda hook. This is the
-  single most common reason a Slurm job dies instantly with
-  `CommandNotFoundError`.
+- `conda activate` needs a hook sourced first in a batch job — a
+  non-interactive shell has no conda function. `greatlakes_env.sh` sources
+  `$CONDA_SH` explicitly rather than deriving it from `conda info --base`,
+  because the inherited `CONDA_EXE` points at `/mnt/turbo/...`, a mount path
+  that no longer exists (Turbo is at `/nfs/turbo`). Deriving the hook picks up
+  whichever conda is on PATH, which is not necessarily the one holding
+  `ENV_PREFIX`. Symptom of getting this wrong, interactively or in a job:
+  `bash: /mnt/turbo/.../conda: No such file or directory`.
+- The env must be **Python 3.11**. `shepherd` declares `>=3.11,<3.12`, so
+  installing from a 3.12 base fails with
+  `Package 'shepherd' requires a different Python`.
 - `--batch-size 25` is a guess for V100 (16 GB) memory. If a task dies with
   CUDA OOM, drop to 10–15; it changes throughput only, not results.
 - `HF_HOME` points at scratch so the checkpoint downloads once and is reused.

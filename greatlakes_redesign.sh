@@ -28,7 +28,7 @@
 # docking score — Boltz-2 will happily pose a warhead that would not react.
 # =============================================================================
 #SBATCH --job-name=tgcpl_redesign
-#SBATCH --account=maom99
+#SBATCH --account=maom0          # must match your Slurm account: run `my_accounts`
 #SBATCH --partition=gpu
 #SBATCH --gpus=1
 #SBATCH --nodes=1

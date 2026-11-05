@@ -5,7 +5,7 @@
 # Run this BEFORE the big jobs; it costs ~10 min of one GPU.
 # =============================================================================
 #SBATCH --job-name=tgcpl_smoke
-#SBATCH --account=maom99
+#SBATCH --account=maom0          # must match your Slurm account: run `my_accounts`
 #SBATCH --partition=gpu
 #SBATCH --gpus=1
 #SBATCH --nodes=1
