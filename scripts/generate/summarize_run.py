@@ -26,9 +26,7 @@ from rdkit.DataStructs import BulkTanimotoSimilarity
 
 RDLogger.DisableLog("rdApp.*")
 
-# Lead SMILES live in the tgcpl package; import rather than duplicate them.
-# Taken from tgcpl.leads directly rather than via tgcpl_generate, so reporting
-# does not drag in torch and the whole shepherd stack just to read a dict.
+# From tgcpl.leads, not tgcpl_generate: reporting should not import torch.
 import sys
 from pathlib import Path
 

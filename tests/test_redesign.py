@@ -1,21 +1,14 @@
 """
 tests/test_redesign.py
 ======================
-Pre-flight check for jobs that use the scaffold cores and property filter, so a
-typo does not cost an 8-hour GPU job.
+Pre-flight for the scaffold cores and property filter, so a typo does not cost
+an 8-hour GPU job.
 
   python tests/test_redesign.py          # ~5 s, RDKit only -- no torch, no GPU
-  python tests/test_redesign.py --full   # also runs a real 2-sample generation
+  python tests/test_redesign.py --full   # adds a real 2-sample generation
 
-Every check prints its expected value next to what it actually got. A clean run
-ends with "ALL CHECKS PASSED" and exit code 0; any failure exits 1.
-
-The quick path imports only tgcpl.leads / scaffolds / properties, which are
-RDKit-only, so it runs in a plain environment. Only --full pulls in the
-generation stack.
-
-What it does NOT check: whether generation is numerically well-behaved at a
-reduced N_x1. Only --full touches the model, and even then only lightly.
+Does NOT check that generation is numerically well-behaved at reduced N_x1;
+only --full touches the model, and lightly.
 """
 
 from __future__ import annotations
@@ -76,7 +69,7 @@ def test_cores() -> None:
         mol = Chem.AddHs(Chem.MolFromSmiles(leads.LEADS[lead]["smiles"]))
         for core in ("warhead_p2n", "warhead_morpholine_p2n"):
             inds = scaffolds.get_scaffold_atom_indices(mol, core)
-            # morpholine contributes exactly one O; its absence proves P1 is free
+            # morpholine's single O: absent means P1 is free
             want_o = 0 if core in scaffolds.P1_FREE_CORES else 1
             n_oxygen = sum(1 for i in inds
                            if mol.GetAtomWithIdx(i).GetSymbol() == "O")
@@ -95,7 +88,7 @@ def test_cores() -> None:
                 free = [nb.GetIdx()
                         for nb in mol.GetAtomWithIdx(acyclic_n[0]).GetNeighbors()
                         if nb.GetIdx() not in inds]
-                # both substituents must be free, or they cannot be regenerated
+                # both substituents must be free to regenerate
                 check(f"{lead} / {core}: free groups on P2 nitrogen", len(free), 2)
 
 
@@ -113,8 +106,7 @@ def test_sizing() -> None:
         got = "ARGPARSE REJECTED"
     check("space-separated negatives parse", got, [-6, -2])
 
-    # The '=' form is a known footgun; confirm it still fails so the comment in
-    # the job scripts stays true.
+    # The '=' form is a footgun; confirm the job scripts' warning stays true.
     try:
         p.parse_args(["--add-atoms-range=-6", "-2"])
         eq_ok = True
@@ -168,7 +160,7 @@ def test_filter_logic() -> None:
               "PASS" if want_pass else f"REJECT containing {want_reason!r}",
               ok=(not why) if want_pass else (want_reason in why))
 
-    # thresholds() should refuse a typo rather than silently ignoring it
+    # thresholds() must refuse a typo, not ignore it
     try:
         properties.thresholds(max_mwt=400)
         typo_caught = False

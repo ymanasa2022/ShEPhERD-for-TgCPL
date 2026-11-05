@@ -1,25 +1,11 @@
 """
 tgcpl -- shared logic for TgCPL-selective inhibitor generation with ShEPhERD-2.
 
-Layout
-------
-  tgcpl.leads       reference compounds and registry-id lookup
-  tgcpl.scaffolds   scaffold cores for --scaffold-constraint
-  tgcpl.properties  rule-based descriptors and triage thresholds
-  tgcpl.conformers  3D embedding (needs the shepherd stack -- NOT imported here)
-
-The CLI entry points at the repo root import from this package:
-
-  tgcpl_generate.py     generation driver
-  filter_generated.py   post-generation triage -> passing.smi / passing.sdf
-  summarize_run.py      reporting over a run directory
-  baseline_scores.py    null-model comparison
-
-conformers is left out of these re-exports on purpose: importing it pulls in
-shepherd and torch, and filtering and reporting should keep working in a plain
-RDKit environment. Import it directly when you need it:
-
-    from tgcpl.conformers import embed_lead
+  leads       reference compounds, registry-id lookup
+  scaffolds   scaffold cores for --scaffold-constraint
+  properties  rule-based descriptors and triage thresholds
+  conformers  3D embedding -- NOT re-exported, since importing it pulls in
+              shepherd and torch. Use `from tgcpl.conformers import embed_lead`.
 """
 
 from __future__ import annotations

@@ -6,10 +6,7 @@
 #   bash greatlakes_setup.sh            # default CUDA build
 #   bash greatlakes_setup.sh cu124      # pick another
 #
-# Idempotent: pulls instead of re-cloning, skips env creation if the prefix
-# exists, so it is safe to re-run after a failure.
-#
-# Paths live in greatlakes_config.sh; edit them there, not here.
+# Idempotent: safe to re-run. Paths live in greatlakes_config.sh.
 # =============================================================================
 
 set -euo pipefail
@@ -30,7 +27,7 @@ echo "    torch   : $CUDA_EXTRA"
 echo
 
 # --- 0. preconditions ------------------------------------------------------
-# --pre-install skips the ENV_PREFIX check: creating it is this script's job.
+# --pre-install skips the ENV_PREFIX check; creating it is this script's job.
 if ! tgcpl_check_paths --pre-install; then
     echo
     echo "Fix the paths in greatlakes_config.sh before continuing." >&2
@@ -40,9 +37,7 @@ fi
 mkdir -p "$SCRATCH" "$(dirname "$ENV_PREFIX")" "$HF_HOME" "$SCRATCH/logs"
 
 # --- 1. conda --------------------------------------------------------------
-# Sourced from CONDA_SH rather than `module load` + `conda info --base`: the
-# inherited CONDA_EXE points at a mount path that no longer exists, so the
-# conda shell function fails on activate. See greatlakes_config.sh.
+# Explicit hook: the inherited CONDA_EXE points at a dead mount path.
 source "$CONDA_SH"
 
 # --- 2. repo ---------------------------------------------------------------
@@ -56,10 +51,7 @@ else
 fi
 
 # --- 3. environment --------------------------------------------------------
-# Built at an explicit --prefix rather than a named env, so it lands exactly
-# where greatlakes_config.sh says. python<3.12 is a hard requirement of the
-# shepherd package; 3.12 fails at metadata resolution with
-# "requires a different Python".
+# python<3.12 is required by shepherd; 3.12 fails at metadata resolution.
 if [ -d "$ENV_PREFIX" ]; then
     echo "[2/4] Env exists at $ENV_PREFIX — skipping create."
 else
@@ -69,9 +61,7 @@ fi
 
 conda activate "$ENV_PREFIX"
 
-# Guard against installing into the wrong interpreter. If activation silently
-# failed, pip would fall back to a user install under ~/.local and scatter
-# torch across the home quota.
+# If activate silently failed, pip would user-install torch into ~/.local.
 _py_prefix="$(python -c 'import sys; print(sys.prefix)')"
 if [ "$_py_prefix" != "$ENV_PREFIX" ]; then
     echo "ERROR: activate did not take." >&2

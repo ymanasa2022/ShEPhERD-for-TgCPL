@@ -2,16 +2,14 @@
 # =============================================================================
 # setup_shepherd2.sh — install ShEPhERD-2 on a generic HPC or workstation.
 #
-# ON GREAT LAKES USE setup/greatlakes_setup.sh INSTEAD. That one reads every
-# path from setup/greatlakes_config.sh, so there is nothing to edit here and
-# nothing to keep in sync. This script is the portable fallback for a machine
-# that has no config file: edit the four paths below, then run it.
+# ON GREAT LAKES USE setup/greatlakes_setup.sh INSTEAD -- it reads its paths
+# from greatlakes_config.sh. This is the portable fallback: edit the paths
+# below, then run it.
 #
 #   bash setup/setup_shepherd2.sh            # default CUDA build
 #   bash setup/setup_shepherd2.sh cu124      # pick another
 #
-# Idempotent: pulls instead of re-cloning, skips env creation if the prefix
-# exists, so it is safe to re-run after a failure.
+# Idempotent: safe to re-run.
 # =============================================================================
 
 set -euo pipefail
@@ -45,9 +43,7 @@ if [ ! -f "$CONDA_SH" ]; then
     exit 1
 fi
 
-# Source the hook explicitly rather than relying on the shell already having
-# conda as a function: a non-interactive shell does not, and an inherited
-# CONDA_EXE can point at a path that no longer exists.
+# Explicit hook: a non-interactive shell has no conda function.
 source "$CONDA_SH"
 
 # --- 1. repo ---------------------------------------------------------------
@@ -61,11 +57,8 @@ else
 fi
 
 # --- 2. environment --------------------------------------------------------
-# Built at an explicit --prefix rather than a named env, so it lands exactly
-# where this script says. python<3.12 is a hard requirement of the shepherd
-# package; 3.12 fails at metadata resolution with "requires a different
-# Python". xtb must come from conda-forge -- it is not pip-installable, and
-# generation dies partway with FileNotFoundError: 'xtb' without it.
+# python<3.12 is required by shepherd. xtb must come from conda-forge: it is
+# not pip-installable, and generation dies mid-run without it.
 if [ -d "$ENV_PREFIX" ]; then
     echo "[2/4] Env exists at $ENV_PREFIX — skipping create."
 else
@@ -76,9 +69,7 @@ fi
 
 conda activate "$ENV_PREFIX"
 
-# Guard against installing into the wrong interpreter. If activation silently
-# failed, pip falls back to a user install under ~/.local and scatters torch
-# across the home quota.
+# If activate silently failed, pip would user-install torch into ~/.local.
 _py_prefix="$(python -c 'import sys; print(sys.prefix)')"
 if [ "$_py_prefix" != "$ENV_PREFIX" ]; then
     echo "ERROR: activate did not take." >&2

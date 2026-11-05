@@ -11,10 +11,8 @@
 # =============================================================================
 # GENERIC SLURM job script for TgCPL ShEPhERD-2 generation.
 #
-# For Great Lakes use slurm_scripts/greatlakes_tgcpl.sbatch instead -- it reads
-# every path from setup/greatlakes_config.sh, so there is nothing to edit. This
-# one is the portable fallback for another cluster: it hardcodes its paths and
-# activates conda by name rather than by prefix.
+# For Great Lakes use greatlakes_tgcpl.sbatch instead. This is the portable
+# fallback: hardcoded paths, conda activated by name.
 #
 # Edit the three paths below, then:
 #   mkdir -p logs

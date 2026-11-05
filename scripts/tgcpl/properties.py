@@ -1,17 +1,11 @@
 """
 Rule-based molecular property calculation and triage.
 
-IMPORTANT: everything here is physicochemistry computed by RDKit -- MW, logP,
-TPSA, HBD/HBA, rotatable bonds, ring size, PAINS. These are developability
-*proxies*, not ADMET predictions. Real absorption/clearance/hERG/microsomal
-stability endpoints need a trained predictor. Treat a pass as "not obviously
-disqualified", not as "good ADMET".
+These are developability proxies, NOT ADMET predictions -- real endpoints need
+a trained predictor. Crippen logP also runs low on this chemotype, so a logP
+ceiling here is softer than the same number elsewhere.
 
-RDKit's Crippen logP also runs low against some commercial calculators on this
-chemotype, so a logP ceiling here is softer than the same number elsewhere.
-
-Depends only on RDKit -- no torch, no shepherd -- so filtering and reporting
-work in a plain environment without the generation stack installed.
+RDKit only: no torch, no shepherd.
 """
 
 from __future__ import annotations
@@ -22,16 +16,12 @@ from rdkit import Chem
 from rdkit.Chem import Crippen, Descriptors, QED, rdMolDescriptors as rdmd
 from rdkit.Chem.FilterCatalog import FilterCatalog, FilterCatalogParams
 
-# Mechanism-critical substructures. The nitrile forms the reversible covalent
-# bond to the catalytic cysteine; lose it and the molecule is not this
-# chemotype, however well it scores on shape.
+# Mechanism-critical: the nitrile is the covalent warhead.
 NITRILE = Chem.MolFromSmarts("C#N")
 TRIAZINE = Chem.MolFromSmarts("c1ncncn1")
 
-#: Defaults for the triage thresholds, shared by the CLI and the tests.
-#: max_ring_size 7 is calibrated against the compound records: across the
-#: series the max-ring histogram is {5: 1, 6: 440, 7: 5}, so 7 admits the real
-#: chemistry and rejects the macrocycles unconstrained generation produces.
+#: Shared by the CLI and the tests. max_ring_size 7 from the series histogram
+#: {5:1, 6:440, 7:5}: admits the real chemistry, rejects macrocycles.
 DEFAULT_THRESHOLDS = {
     "max_mw": 500.0,
     "max_rotb": 10,
@@ -75,11 +65,7 @@ def describe(mol: Chem.Mol) -> dict:
 
 
 def thresholds(**overrides) -> argparse.Namespace:
-    """Build a threshold namespace from DEFAULT_THRESHOLDS plus overrides.
-
-    Lets tests and callers construct the same object argparse produces without
-    restating every field.
-    """
+    """DEFAULT_THRESHOLDS plus overrides, as the namespace argparse yields."""
     merged = dict(DEFAULT_THRESHOLDS)
     unknown = set(overrides) - set(merged)
     if unknown:
@@ -94,11 +80,8 @@ def reasons_to_reject(
     limits: argparse.Namespace,
     pains: FilterCatalog | None = None,
 ) -> list[str]:
-    """Why this molecule fails triage; empty list means it passes.
-
-    Returns every reason, not just the first, so a rejection tally shows which
-    constraint is actually binding.
-    """
+    """Why this molecule fails triage; [] means it passes. Returns every
+    reason, so a tally shows which constraint is binding."""
     out = []
     if limits.require_warhead and not mol.HasSubstructMatch(NITRILE):
         out.append("no-nitrile")

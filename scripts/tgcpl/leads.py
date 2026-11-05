@@ -11,8 +11,10 @@ All are triazine-nitrile reversible covalent inhibitors targeting Cys31 (TgCPL)
 ``vmcc`` is the compound-registry substance_id, so generated output can be
 joined back to assay records without a separate lookup table.
 
-Potency values come from the project's SAR write-up and may lag the raw assay
-records; check those before using the numbers quantitatively.
+Potency = experimental readouts, 10 ** mean_log_ic50(uM) * 1000, matched by
+InChIKey. NOT the SAR write-up's figures, which differ for 3 of 4 leads
+(Cpd1: 7.0x there vs 16.2x here). Cpd1 is the --dual-target anti-target, so
+the gap narrows that run's premise.
 """
 
 from __future__ import annotations
@@ -21,33 +23,33 @@ LEADS: dict[str, dict] = {
     "Cpd1": {
         "smiles": "CCN(CC)CCN(Cc1ccc(F)cc1)c1nc(C#N)nc(N2CCOCC2)n1",
         "vmcc": "VMCC-0000178",
-        "tgcpl_ic50_nM": 320,
-        "hscpl_ic50_nM": 2240,
-        "selectivity": 7.0,
+        "tgcpl_ic50_nM": 222.0,
+        "hscpl_ic50_nM": 3600.6,
+        "selectivity": 16.22,
         "note": "Parent compound; no benzylic substituent",
     },
     "Cpd12": {
         "smiles": "CCN(CC)CCN(c1nc(C#N)nc(N2CCOCC2)n1)C(c1ccc(F)cc1)C1CCCCC1",
         "vmcc": "VMCC-0005199",
-        "tgcpl_ic50_nM": 629,
-        "hscpl_ic50_nM": 23245,
-        "selectivity": 36.9,
+        "tgcpl_ic50_nM": 557.6,
+        "hscpl_ic50_nM": 18515.0,
+        "selectivity": 33.21,
         "note": "Cyclohexyl benzylic; best single-SAR compound",
     },
     "Cpd13": {
         "smiles": "CCN(CC)CCN(c1nc(C#N)nc(N2CCOCC2)n1)C(c1ccc(F)cc1)C1CCCCCC1",
         "vmcc": "VMCC-0005223",
-        "tgcpl_ic50_nM": 497,
-        "hscpl_ic50_nM": 19695,
-        "selectivity": 39.6,
+        "tgcpl_ic50_nM": 496.8,
+        "hscpl_ic50_nM": 19695.0,
+        "selectivity": 39.65,
         "note": "Cycloheptyl benzylic; best selectivity overall",
     },
     "Cpd18": {
         "smiles": "N#Cc1nc(N2CCOCC2)nc(N(CCC2CCNCC2)C(c2ccc(F)cc2)C2CCCCC2)n1",
         "vmcc": "VMCC-0005222",
-        "tgcpl_ic50_nM": 210,
-        "hscpl_ic50_nM": 8080,
-        "selectivity": 38.5,
+        "tgcpl_ic50_nM": 207.1,
+        "hscpl_ic50_nM": 6845.5,
+        "selectivity": 33.05,
         "note": "Best potency + high selectivity; piperidinylethyl P2",
     },
 }
@@ -69,11 +71,8 @@ def get_lead(name: str) -> dict:
 
 
 def registry_id(name: str) -> str:
-    """Registry substance_id for a lead, or the name itself if none is recorded.
-
-    Used to name run directories, so it must always return something usable as
-    a path component rather than raising on an incomplete record.
-    """
+    """Registry id, or the name if none recorded. Always path-safe: it names
+    run directories, so it must not raise on an incomplete record."""
     return get_lead(name).get("vmcc") or name
 
 

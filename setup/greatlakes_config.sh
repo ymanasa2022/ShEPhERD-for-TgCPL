@@ -17,9 +17,7 @@ REPO_DIR="$TURBO/opt/shepherd2"
 TGCPL_DIR="$TURBO/campaigns/tgcpl-martin-campaign/scripts/ShEPhERD-for-TgCPL"
 ENV_PREFIX="$TURBO/micromamba/envs/shepherd2"
 
-# Layout inside the repo, stated once here so job scripts do not hardcode it.
-# The Python entry points bootstrap sys.path themselves, so these are for the
-# shell's convenience and are not an import requirement.
+# Repo layout, stated once. The Python entry points fix sys.path themselves.
 SCRIPTS_DIR="$TGCPL_DIR/scripts"          # holds the importable tgcpl package
 GENERATE_DIR="$SCRIPTS_DIR/generate"      # filter_generated.py, summarize_run.py
 TGCPL_PKG_DIR="$SCRIPTS_DIR/tgcpl"        # tgcpl_generate.py + the package

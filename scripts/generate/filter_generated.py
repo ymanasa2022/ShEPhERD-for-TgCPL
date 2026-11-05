@@ -5,20 +5,16 @@ Post-generation triage for tgcpl_generate.py output.
 
 Applies, in order:
   1. parse + dedupe by canonical SMILES
-  2. MECHANISM  : nitrile warhead and triazine must survive (ShEPhERD conditions
-                  on a 3D field, not a substructure, so it is free to drop them)
+  2. MECHANISM  : nitrile and triazine must survive -- generation conditions
+                  on a 3D field, so it is free to drop them
   3. SIZE       : MW ceiling
   4. FLEXIBILITY: rotatable-bond ceiling
   5. RINGS      : max ring size -- rejects macrocycles and other oversized rings
   6. PROPERTIES : rule-based developability filters (Lipinski / Veber)
   7. PAINS      : RDKit FilterCatalog assay-interference substructures
 
-A NOTE ON "ADMET": everything here is rule-based physicochemistry computed by
-RDKit -- MW, logP, TPSA, HBD/HBA, rotatable bonds, PAINS. These are developability
-*proxies*, not ADMET predictions. Real absorption/clearance/hERG/microsomal
-stability endpoints need a trained predictor (ADMET-AI, Schrodinger QikProp, or
-the paper's own AutoML ensemble). Treat a pass here as "not obviously
-disqualified", not as "good ADMET".
+NOTE: rule-based physicochemistry, not ADMET prediction. A pass means "not
+obviously disqualified". Real endpoints need a trained predictor.
 
 Usage:
   python filter_generated.py tgcpl_outputs/run_vmcc5199_mw400
@@ -34,9 +30,7 @@ from pathlib import Path
 
 from rdkit import Chem, RDLogger
 
-# scripts/generate/ is this file's directory; the tgcpl package sits beside it
-# under scripts/. Put the parent on sys.path so `import tgcpl` resolves however
-# this is invoked.
+# tgcpl sits beside this file's directory, under scripts/.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from tgcpl.properties import (  # noqa: E402
@@ -67,8 +61,7 @@ def main() -> None:
     ap.add_argument("--max-mw", type=float, default=_D["max_mw"])
     ap.add_argument("--max-rotb", type=int, default=_D["max_rotb"])
     ap.add_argument("--max-ring-size", type=int, default=_D["max_ring_size"],
-                    help="Largest allowed ring. 7 keeps cycloheptyl (Cpd13) and "
-                         "rejects macrocycles")
+                    help="Largest allowed ring; 7 keeps cycloheptyl, drops macrocycles")
     ap.add_argument("--max-logp", type=float, default=_D["max_logp"])
     ap.add_argument("--max-hbd", type=int, default=_D["max_hbd"])
     ap.add_argument("--max-hba", type=int, default=_D["max_hba"])
@@ -82,10 +75,8 @@ def main() -> None:
     ap.add_argument("--out", type=Path, default=None,
                     help="Write passing SMILES here (default: <target>/passing.smi)")
     ap.add_argument("--out-sdf", type=Path, default=None,
-                    help="Write passing molecules WITH 3D coordinates here "
-                         "(default: <target>/passing.sdf). This is the file to "
-                         "hand to Boltz-2 -- the conformers are already "
-                         "xTB-relaxed, so they do not need re-embedding.")
+                    help="Passing molecules with 3D coords, for docking "
+                         "(default: <target>/passing.sdf)")
     args = ap.parse_args()
 
     sdfs = collect_sdfs(args.target)
@@ -155,9 +146,7 @@ def main() -> None:
                 fh.write(f"{smi}\tMW={d['mw']:.1f}\tQED={d['qed']:.2f}\n")
         print(f"\nWrote {len(passing)} SMILES -> {out}")
 
-        # 3D SDF for downstream covalent docking. Coordinates come straight
-        # from generation + xTB relaxation, so Boltz-2 gets a real conformer
-        # rather than a fresh RDKit embedding of the SMILES.
+        # 3D SDF for docking: xTB-relaxed coords, no re-embedding needed.
         out_sdf = args.out_sdf or base / "passing.sdf"
         w = Chem.SDWriter(str(out_sdf))
         for smi, mol, d, _ in passing:

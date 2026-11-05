@@ -15,14 +15,11 @@ if ! tgcpl_check_paths; then
     return 1 2>/dev/null || exit 1
 fi
 
-# Source the hook explicitly. Deriving it from `conda info --base` picks up
-# whatever conda is on PATH, which in a batch job is not necessarily the one
-# holding ENV_PREFIX -- see the CONDA_SH note in greatlakes_config.sh.
+# Explicit hook: `conda info --base` picks up whatever conda is on PATH.
 source "$CONDA_SH"
 conda activate "$ENV_PREFIX"
 
-# Activating is what puts `xtb` on PATH. Without it generation dies partway in
-# with FileNotFoundError: 'xtb', after the model has already loaded.
+# Activating is what puts xtb on PATH; without it generation dies mid-run.
 if ! command -v xtb >/dev/null; then
     echo "greatlakes_env.sh: xtb not on PATH after activating $ENV_PREFIX" >&2
     echo "  The env is missing its conda-forge xtb package." >&2

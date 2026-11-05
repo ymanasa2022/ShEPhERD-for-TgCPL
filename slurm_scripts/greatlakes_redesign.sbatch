@@ -1,31 +1,23 @@
 #!/usr/bin/env bash
 # =============================================================================
-# greatlakes_redesign.sh — VMCC-0005199 / Cpd18 three-point redesign, 2x2.
+# Three-point redesign, 2x2: {Cpd12, Cpd18} x {P1 replaced, P1 kept}.
+# 100 samples each, filtered, written as a 3D SDF for docking.
 #
-#   sbatch --array=1-4 greatlakes_redesign.sh      # all four
-#   sbatch --array=2   greatlakes_redesign.sh      # just one
+#   sbatch --array=1-4 slurm_scripts/greatlakes_redesign.sbatch
 #
-# Four runs = {Cpd12, Cpd18} x {morpholine replaced, morpholine kept}.
-# 100 samples each. Output is filtered and written as a 3D SDF for Boltz-2.
+#   task  ref    P1         core
+#     1   Cpd12  REPLACED   warhead_p2n
+#     2   Cpd12  KEPT       warhead_morpholine_p2n
+#     3   Cpd18  REPLACED   warhead_p2n
+#     4   Cpd18  KEPT       warhead_morpholine_p2n
 #
-#   task  reference              P1 morpholine  scaffold core
-#   ----  ---------------------  -------------  -----------------------
-#     1   VMCC-0005199 (Cpd12)   REPLACED       warhead_p2n
-#     2   VMCC-0005199 (Cpd12)   KEPT           warhead_morpholine_p2n
-#     3   VMCC-0005222 (Cpd18)   REPLACED       warhead_p2n
-#     4   VMCC-0005222 (Cpd18)   KEPT           warhead_morpholine_p2n
+# Both cores pin the P2 nitrogen, so its two groups regrow in every run; only
+# P1 differs, which is what makes 1-vs-2 and 3-vs-4 clean comparisons.
 #
-# Output: $OUTPUT_ROOT/redesign_<VMCC>_<arm>_<YYYYmmdd_HHMMSS>/
+# Tasks 1 and 3 free P1, which tunes the nitrile's electrophilicity: those need
+# a covalent-reactivity check, not just a docking score.
 #
-# Both cores pin the P2 nitrogen itself, so in every run the two groups on that
-# nitrogen — the benzylic aryl/cycloalkyl and the basic chain — are regenerated.
-# The only difference across the pair is whether P1 is held or explored, which
-# is what makes 1-vs-2 and 3-vs-4 clean comparisons.
-#
-# Reactivity caveat for tasks 1 and 3: the nitrile's electrophilicity depends on
-# how electron-poor the triazine is, and the P1 substituent tunes exactly that.
-# Molecules from the "replaced" arm need a covalent-reactivity check, not just a
-# docking score — Boltz-2 will happily pose a warhead that would not react.
+# Output: $OUTPUT_ROOT/redesign_<registry-id>_<arm>_<YYYYmmdd_HHMMSS>/
 # =============================================================================
 #SBATCH --job-name=tgcpl_redesign
 #SBATCH --account=maom0          # must match your Slurm account: run `my_accounts`
@@ -53,39 +45,22 @@ N_SAMPLES=100
 BATCH_SIZE=25
 SEED=42
 
-# MW ceiling for this campaign.
 MAX_MW=500
-# Rotatable-bond ceiling: Cpd12's own value, so nothing in the lead series is
-# excluded by its own criterion.
-MAX_ROTB=10
-# Largest ring allowed. 7 keeps cycloheptyl (Cpd13, the 39.6x compound) and
-# rejects macrocycles — prior unconstrained runs produced 11-, 12- and
-# 14-membered rings, which are not useful starting points for this series.
-MAX_RING=7
+MAX_ROTB=10        # Cpd12's own value, so no lead fails its own criterion
+MAX_RING=7         # keeps cycloheptyl; prior runs made 11-14-membered rings
 
-# N_x1 offset. Cpd12 embeds to 74 atoms (incl. H) at 495.6 Da and Cpd18 to 75 at
-# 507.7 Da, i.e. ~6.7-6.8 Da/atom. Left at the reference count, generation
-# centres right on the 500 ceiling and roughly half the output fails the filter
-# on MW alone. Shaving 2-6 atoms recentres the distribution on ~460-485 Da.
-#
-# Pass space-separated: "--add-atoms-range=-6 -2" does NOT parse under argparse,
-# "--add-atoms-range -6 -2" does.
+# N_x1 offset: at the reference atom count generation centres on the 500
+# ceiling and ~half fails on MW. Shaving 2-6 atoms recentres below it.
+# Must be space-separated; the "=-6" form does not parse.
 ADD_ATOMS_MIN=-6
 ADD_ATOMS_MAX=-2
 
 # --- per-task configuration --------------------------------------------------
-# Run stamp. All four tasks should share ONE stamp so the campaign groups in a
-# listing; array tasks start at slightly different times, so taking `date`
-# per-task would scatter them across several minutes. Export it at submission:
-#
-#   RUN_STAMP=$(date +%Y%m%d_%H%M%S) sbatch --export=ALL --array=1-4 greatlakes_redesign.sh
-#
-# The fallback keeps a bare `sbatch` working, just with per-task stamps.
+# Share one stamp across the array, else tasks stamp themselves minutes apart:
+#   RUN_STAMP=$(date +%Y%m%d_%H%M%S) sbatch --export=ALL --array=1-4 ...
 RUN_STAMP="${RUN_STAMP:-$(date +%Y%m%d_%H%M%S)}"
 
-# Runs are named by registry id rather than the repo's internal CpdN labels, so
-# output directories join back to the compound records without a lookup table.
-# The ids come from LEADS[<name>]["vmcc"] in tgcpl_generate.py.
+# Named by registry id so output joins back to the compound records.
 case "${SLURM_ARRAY_TASK_ID:?set --array, e.g. sbatch --array=1-4}" in
   1) REF=Cpd12; VMCC=VMCC-0005199; CORE=warhead_p2n;            ARM=p1replaced ;;
   2) REF=Cpd12; VMCC=VMCC-0005199; CORE=warhead_morpholine_p2n; ARM=p1kept     ;;
@@ -120,8 +95,7 @@ python "$TGCPL_PKG_DIR/tgcpl_generate.py" \
     --seed "$SEED"
 
 # --- filter ------------------------------------------------------------------
-# Writes passing.smi and passing.sdf. The SDF carries the xTB-relaxed 3D
-# coordinates, so it goes straight to Boltz-2 without re-embedding.
+# Writes passing.smi and passing.sdf (xTB-relaxed coords, ready for docking).
 echo
 echo ">>> filtering ${TAG}"
 python "$GENERATE_DIR/filter_generated.py" "$OUT_DIR" \
