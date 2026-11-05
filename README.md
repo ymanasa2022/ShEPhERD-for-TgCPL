@@ -29,7 +29,7 @@ tests/
   test_redesign.py          pre-flight: cores, sizing, filter. No GPU needed
   local_smoke_test.sh       end-to-end on CPU
   greatlakes_smoke_test.sh  end-to-end on a GPU node
-TgCPL/
+data/
   lead_molecules.smi        SMILES + IC50/selectivity for all leads
 ```
 
@@ -252,17 +252,17 @@ react.
 ## Lead molecules
 
 Structures and assay values are **not tracked by git**. `scripts/tgcpl/leads.py`
-loads them at import from `TgCPL/leads.tsv`, which is gitignored.
+loads them at import from `data/leads.tsv`, which is gitignored.
 
 A fresh clone has no such file and will raise on import. Give it one:
 
 ```bash
-cp TgCPL/leads.example.tsv TgCPL/leads.tsv   # then fill in the real values
+cp data/leads.example.tsv data/leads.tsv   # then fill in the real values
 # or keep it outside the repo:
 export TGCPL_LEADS=/path/to/leads.tsv
 ```
 
-`TgCPL/leads.example.tsv` documents the columns and ships placeholder rows
+`data/leads.example.tsv` documents the columns and ships placeholder rows
 (benzene, toluene) so the package imports and the tests run without any real
 data present.
 
@@ -270,7 +270,7 @@ data present.
 copy it across once:
 
 ```bash
-scp TgCPL/leads.tsv greatlakes:$TGCPL_DIR/TgCPL/
+scp data/leads.tsv greatlakes:$TGCPL_DIR/TgCPL/
 ```
 
 Lead names used on the command line (`--ref-smiles Cpd12`) are the `name`
