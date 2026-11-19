@@ -1,0 +1,102 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 752" width="900" height="752"
+     role="img" aria-label="TgCPL generation and selectivity pipeline: Cpd12 and Cpd18 condition ShEPhERD-2 generation with the warhead-morpholine-P2N core pinned, output is filtered on warhead retention and physicochemical ceilings, then each survivor is co-folded against both TgCPL 3F75 and HsCPL 5MAJ and the predicted affinities subtracted.">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#222222"/>
+    </marker>
+    <marker id="at" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#0f766e"/>
+    </marker>
+  </defs>
+
+  <rect width="900" height="752" fill="#ffffff"/>
+
+  <g font-family="Helvetica,Arial,sans-serif" fill="#222222">
+
+    <!-- ============ references ============ -->
+    <rect x="24" y="24" width="852" height="104" rx="4" fill="#f6f7f8" stroke="#222222" stroke-width="1.2"/>
+    <text x="40" y="46" font-size="12" font-weight="bold" letter-spacing="0.6">REFERENCE LEADS</text>
+    <text x="178" y="46" font-size="11" fill="#6b7280">data/leads.tsv &#183; TgCPL-selective, P1 morpholine shared</text>
+
+    <text x="40" y="72" font-size="11.5" font-weight="bold">Cpd12</text>
+    <text x="90" y="72" font-size="10.5" fill="#6b7280">VMCC-0005199 &#183; 558 nM &#183; 33&#215;</text>
+    <text x="300" y="72" font-size="9.5" font-family="Menlo,Consolas,monospace">CCN(CC)CCN(c1nc(C#N)nc(N2CCOCC2)n1)C(c1ccc(F)cc1)C1CCCCC1</text>
+
+    <text x="40" y="104" font-size="11.5" font-weight="bold">Cpd18</text>
+    <text x="90" y="104" font-size="10.5" fill="#6b7280">VMCC-0005222 &#183; 207 nM &#183; 33&#215;</text>
+    <text x="300" y="104" font-size="9.5" font-family="Menlo,Consolas,monospace">N#Cc1nc(N2CCOCC2)nc(N(CCC2CCNCC2)C(c2ccc(F)cc2)C2CCCCC2)n1</text>
+
+    <line x1="450" y1="128" x2="450" y2="166" stroke="#222222" stroke-width="1.4" marker-end="url(#a)"/>
+    <text x="462" y="152" font-size="10.5" fill="#6b7280">embed &#8594; xTB interaction profile (shape / ESP / pharmacophore)</text>
+
+    <!-- ============ generate ============ -->
+    <rect x="24" y="166" width="852" height="98" rx="4" fill="#ffffff" stroke="#222222" stroke-width="1.2"/>
+    <text x="40" y="188" font-size="12" font-weight="bold" letter-spacing="0.6">GENERATE</text>
+    <text x="134" y="188" font-size="11" fill="#6b7280">ShEPhERD-2 &#183; greatlakes_redesign.sbatch --array=2,4</text>
+
+    <text x="40" y="212" font-size="11">core <tspan font-family="Menlo,Consolas,monospace" font-size="10">warhead_morpholine_p2n</tspan> &#8594; 15 atoms pinned</text>
+    <text x="40" y="232" font-size="11">N_x1 offset &#8722;6 &#8230; &#8722;2 &#183; 100 samples &#183; batch 25 &#183; seed 42 &#183; condition all</text>
+    <text x="40" y="252" font-size="10" fill="#6b7280">warhead + P1 + P2 nitrogen fixed, so only the P2/P3 substituents regrow</text>
+
+    <text x="560" y="212" font-size="10" fill="#6b7280">Why the negative offset:</text>
+    <text x="560" y="230" font-size="10" fill="#6b7280">at the reference atom count generation</text>
+    <text x="560" y="246" font-size="10" fill="#6b7280">centres on MW 500 and ~half fails.</text>
+
+    <line x1="450" y1="264" x2="450" y2="302" stroke="#222222" stroke-width="1.4" marker-end="url(#a)"/>
+
+    <!-- ============ filter ============ -->
+    <rect x="24" y="302" width="852" height="140" rx="4" fill="#ffffff" stroke="#222222" stroke-width="1.2"/>
+    <text x="40" y="324" font-size="12" font-weight="bold" letter-spacing="0.6">FILTER</text>
+    <text x="110" y="324" font-size="11" fill="#6b7280">filter_generated.py &#183; dedupe by canonical SMILES, then reject on:</text>
+
+    <text x="40" y="350" font-size="11" font-weight="bold" fill="#0f766e">MECHANISM</text>
+    <text x="40" y="370" font-size="11">nitrile <tspan font-family="Menlo,Consolas,monospace" font-size="10">C#N</tspan> required</text>
+    <text x="40" y="388" font-size="11">triazine <tspan font-family="Menlo,Consolas,monospace" font-size="10">c1ncncn1</tspan> required</text>
+    <text x="40" y="412" font-size="10" fill="#6b7280">ShEPhERD conditions on a field,</text>
+    <text x="40" y="426" font-size="10" fill="#6b7280">not a substructure &#8212; it may drop these.</text>
+
+    <text x="330" y="350" font-size="11" font-weight="bold">SIZE / SHAPE</text>
+    <text x="330" y="370" font-size="11">MW &#8804; 500</text>
+    <text x="330" y="388" font-size="11">rotatable bonds &#8804; 10</text>
+    <text x="330" y="406" font-size="11">max ring size &#8804; 7</text>
+    <text x="330" y="428" font-size="10" fill="#6b7280">ring 7 keeps cycloheptyl; series is {5:1, 6:440, 7:5}</text>
+
+    <text x="640" y="350" font-size="11" font-weight="bold">DEVELOPABILITY</text>
+    <text x="640" y="370" font-size="11">logP &#8804; 5.0 &#183; TPSA &#8804; 140</text>
+    <text x="640" y="388" font-size="11">HBD &#8804; 5 &#183; HBA &#8804; 10</text>
+    <text x="640" y="406" font-size="11">PAINS substructures</text>
+    <text x="640" y="428" font-size="10" fill="#6b7280">rule-based, NOT ADMET prediction</text>
+
+    <line x1="450" y1="442" x2="450" y2="478" stroke="#222222" stroke-width="1.4" marker-end="url(#a)"/>
+
+    <!-- ============ passing ============ -->
+    <rect x="252" y="478" width="396" height="50" rx="4" fill="#f6f7f8" stroke="#222222" stroke-width="1.2"/>
+    <text x="272" y="500" font-size="11" font-family="Menlo,Consolas,monospace">passing.smi &#183; passing.sdf</text>
+    <text x="272" y="518" font-size="10" fill="#6b7280">xTB-relaxed 3D coords &#8212; no re-embedding before docking</text>
+
+    <!-- ============ fork to the two targets ============ -->
+    <path d="M450,528 L450,552" stroke="#0f766e" stroke-width="1.4" fill="none"/>
+    <path d="M450,552 L230,552 L230,580" stroke="#0f766e" stroke-width="1.4" fill="none" marker-end="url(#at)"/>
+    <path d="M450,552 L670,552 L670,580" stroke="#0f766e" stroke-width="1.4" fill="none" marker-end="url(#at)"/>
+    <text x="462" y="548" font-size="10" fill="#0f766e">same ligand, both enzymes</text>
+
+    <rect x="92" y="580" width="276" height="62" rx="4" fill="#ffffff" stroke="#0f766e" stroke-width="1.4"/>
+    <text x="110" y="602" font-size="11.5" font-weight="bold" fill="#0f766e">TgCPL &#183; PDB 3F75</text>
+    <text x="110" y="622" font-size="10.5">Boltz-2 co-fold + affinity</text>
+    <text x="110" y="636" font-size="10" fill="#6b7280">acidic S2: Glu75 / Asp218</text>
+
+    <rect x="532" y="580" width="276" height="62" rx="4" fill="#ffffff" stroke="#0f766e" stroke-width="1.4"/>
+    <text x="550" y="602" font-size="11.5" font-weight="bold" fill="#0f766e">HsCPL &#183; PDB 5MAJ</text>
+    <text x="550" y="622" font-size="10.5">Boltz-2 co-fold + affinity</text>
+    <text x="550" y="636" font-size="10" fill="#6b7280">hydrophobic S2: Leu69 / Ala214</text>
+
+    <path d="M230,642 L230,668 L450,668" stroke="#0f766e" stroke-width="1.4" fill="none"/>
+    <path d="M670,642 L670,668 L450,668" stroke="#0f766e" stroke-width="1.4" fill="none"/>
+    <path d="M450,668 L450,690" stroke="#0f766e" stroke-width="1.4" fill="none" marker-end="url(#at)"/>
+
+    <!-- ============ selectivity ============ -->
+    <rect x="186" y="690" width="528" height="48" rx="4" fill="#ecfdf5" stroke="#0f766e" stroke-width="1.4"/>
+    <text x="206" y="711" font-size="11.5" font-weight="bold" fill="#0f766e">&#916; log&#8321;&#8320;IC&#8325;&#8320; = HsCPL &#8722; TgCPL</text>
+    <text x="206" y="729" font-size="10" fill="#6b7280">positive = TgCPL-preferring &#183; 4 leads co-folded as controls, read first</text>
+  </g>
+</svg>
