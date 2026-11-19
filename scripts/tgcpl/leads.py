@@ -1,8 +1,8 @@
 """Reference lead molecules, loaded from data/leads.tsv (TGCPL_LEADS overrides).
 
 Potency columns are experimental readouts, NOT the SAR write-up's figures,
-which differ for 3 of 4 leads (Cpd1: 7.0x there vs 16.2x here). Cpd1 is the
---dual-target anti-target, so that gap narrows the run's premise.
+which differ for 3 of 4 leads (Cpd1: 7.0x there vs 16.2x here). Cpd1 is the least
+selective lead on either set.
 """
 
 from __future__ import annotations

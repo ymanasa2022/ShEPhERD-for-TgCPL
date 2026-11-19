@@ -69,7 +69,7 @@ instead of 8 hours into a full run.
 ## 4. Production runs
 
 ```bash
-sbatch slurm_scripts/greatlakes_tgcpl.sbatch            # all five
+sbatch slurm_scripts/greatlakes_tgcpl.sbatch            # all four
 sbatch --array=3 slurm_scripts/greatlakes_tgcpl.sbatch  # just run 3
 ```
 
@@ -79,9 +79,8 @@ sbatch --array=3 slurm_scripts/greatlakes_tgcpl.sbatch  # just run 3
 | 2 | Cpd18 | shape+ESP only | 100 |
 | 3 | Cpd18 | all, grown 2–6 atoms | 100 |
 | 4 | Cpd12 | all, scaffold-fixed | 100 |
-| 5 | Cpd18 vs Cpd1 | dual-target, scaffold-fixed | 100 |
 
-A job array rather than one script running five jobs back to back: they run in
+A job array rather than one script running the jobs back to back: they run in
 parallel, each gets the full 8 h, and one failure doesn't take the rest down.
 
 ## 5. Generating from Cpd12 and Cpd18

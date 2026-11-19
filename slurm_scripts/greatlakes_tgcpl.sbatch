@@ -6,7 +6,7 @@
 #   task 2  Cpd18, shape+ESP only
 #   task 3  Cpd18, grown 2-6 atoms
 #   task 4  Cpd12, scaffold-constrained
-#   task 5  dual-target Cpd18 vs Cpd1
+#   task 5  REMOVED (dual-target; lives on the selectivity branch)
 #   task 6  SUPERSEDED by greatlakes_redesign.sbatch
 #   task 99 Cpd12 redesign under a 400 Da ceiling
 #SBATCH --job-name=tgcpl_gen
@@ -18,7 +18,7 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=48G
 #SBATCH --time=08:00:00
-#SBATCH --array=1-5
+#SBATCH --array=1-4
 #SBATCH --output=%x_%A_%a.out
 #SBATCH --error=%x_%A_%a.err
 #SBATCH --mail-type=END,FAIL
@@ -83,17 +83,9 @@ case "$SLURM_ARRAY_TASK_ID" in
           --seed 42
       ;;
 
-  5)  # Selectivity at the model level: ON Cpd18, NOT Cpd1.
-      echo ">>> run5: dual-target Cpd18 vs Cpd1, scaffold-constrained, 100 samples"
-      python "$TGCPL_PKG_DIR/tgcpl_generate.py" \
-          --dual-target \
-          --dual-tgcpl-ref Cpd18 \
-          --dual-hscpl-ref Cpd1 \
-          --scaffold-constraint \
-          --n-samples 100 \
-          --batch-size 25 \
-          --output-dir "$OUTPUT_ROOT/run5_dual_target" \
-          --seed 42
+  5)  # Dual-target generation moved to the selectivity branch, where
+      # selectivity is decided by docking instead.
+      echo "run5 removed: dual-target lives on the selectivity branch"; exit 1
       ;;
 
   6)  # Kept so an old `sbatch --array=6` fails loudly instead of vanishing.

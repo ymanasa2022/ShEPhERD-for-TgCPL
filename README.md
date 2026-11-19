@@ -170,41 +170,6 @@ python scripts/tgcpl/tgcpl_generate.py --ref-smiles Cpd12 --n-samples 100 --scaf
 Fixes the triazine-CN-morpholine warhead atoms. Only varies the P2+P3 portions.
 Guarantees the covalent warhead is preserved.
 
-### Run 5: Dual-target selectivity — TgCPL AND NOT HsCPL ⭐
-```bash
-python scripts/tgcpl/tgcpl_generate.py --dual-target --dual-tgcpl-ref Cpd18 --dual-hscpl-ref Cpd1 \
-    --n-samples 100 --scaffold-constraint
-```
-Uses ShEPhERD's `generate_composition()` with a signed composition:
-
-```
-weights_conditions = [+0.5, -0.5]
-profiles = [profile_TgCPL_Cpd18, profile_HsCPL_Cpd1]
-composition_mode = 'conditional'
-```
-
-This directly encodes **"generate molecules that look like Cpd18 in TgCPL AND do NOT look like Cpd1 in HsCPL"**. The −0.5 weight on the HsCPL profile repels generation away from the hydrophobic HsCPL S2 pocket features, while +0.5 on the TgCPL profile attracts toward the acidic TgCPL S2 pocket features.
-
-**Why Cpd1 as the HsCPL reference?** Cpd1 is the series parent: potent on
-HsCPL and the least selective lead, so its profile captures the undesirable
-hydrophobic HsCPL S2 contacts the composition should steer away from.
-
-> **Note on the assay numbers.** `scripts/tgcpl/leads.py` carries the
-> experimental readouts, not the figures from the SAR write-up; the two differ
-> for three of the four leads, most sharply for Cpd1. Cpd1 is still the least
-> selective lead on either set, so this run's premise holds either way — but by
-> a narrower margin than the write-up implies. Worth knowing before quoting a
-> selectivity fold-change from this repo.
-
-**Mechanistic interpretation**:
-- TgCPL profile (Cpd18): encodes deep acidic S2 pocket; Glu75 + Asp218 contacts; narrow S2 geometry
-- HsCPL profile (Cpd1): encodes shallow hydrophobic S2; Leu69 + Ala214 contacts; wider S2 geometry
-- The AND NOT composition steers the diffusion denoising process toward TgCPL-fitting electrostatics and away from HsCPL-fitting hydrophobics
-
-**Expected output**: molecules with novel scaffolds that maintain the triazine-nitrile warhead (scaffold constraint) but find new ways to project a basic amine toward TgCPL's acidic residues while avoiding bulky hydrophobic P2 groups that would fit HsCPL.
-
----
-
 ## Post-generation analysis
 
 `filter_generated.py` does the triage. It globs recursively, so point it at a
