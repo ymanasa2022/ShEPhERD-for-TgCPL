@@ -32,8 +32,15 @@
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+# sbatch copies this script into Slurm's spool dir, so BASH_SOURCE
+# points there, not at the repo. Use the submit directory under Slurm;
+# TGCPL_REPO overrides when submitting from outside the repo.
+REPO_ROOT="${TGCPL_REPO:-${SLURM_SUBMIT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}}"
+if [ ! -f "$REPO_ROOT/setup/greatlakes_config.sh" ]; then
+    echo "ERROR: no repo at $REPO_ROOT" >&2
+    echo "  submit from the repo root, or export TGCPL_REPO=/path/to/repo" >&2
+    exit 1
+fi
 
 # Paths only -- do NOT source greatlakes_env.sh: it activates the shepherd env,
 # and this job wants the boltz env.
