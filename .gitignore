@@ -12,3 +12,6 @@ __pycache__/
 
 # OneDrive recreates this as empty stubs after the rename to data/.
 /TgCPL/
+
+# macOS Finder metadata.
+.DS_Store

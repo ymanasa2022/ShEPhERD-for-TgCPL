@@ -242,12 +242,30 @@ Then prioritize candidates for:
 2. QSAR model prediction (the AutoML ensemble from the paper)
 3. Experimental IC50 testing
 
-For runs that free the P1 morpholine, add a covalent-reactivity check: the
-nitrile's electrophilicity depends on how electron-poor the triazine is, and P1
-tunes exactly that. A docking score will not catch a warhead that would not
-react.
-
 ---
+
+## Generating from Cpd12 and Cpd18
+
+Tasks 2 and 4 of the redesign campaign are the two TgCPL-selective leads with
+the P1 morpholine pinned:
+
+```bash
+RUN_STAMP=$(date +%Y%m%d_%H%M%S) \
+    sbatch --export=ALL --array=2,4 slurm_scripts/greatlakes_redesign.sbatch
+```
+
+| task | reference | core |
+|---|---|---|
+| 2 | Cpd12 | `warhead_morpholine_p2n` |
+| 4 | Cpd18 | `warhead_morpholine_p2n` |
+
+Both pin the P2 nitrogen, so its two substituents regrow in every sample while
+the warhead and P1 stay fixed. Use `--array=1-4` to also get the arms that free
+P1: those explore S1 but change the nitrile's electrophilicity, so they need a
+covalent-reactivity check rather than a docking score alone.
+
+Each task ends by running `filter_generated.py`, which writes `passing.smi` and
+`passing.sdf` (xTB-relaxed coordinates, ready for docking).
 
 ## Lead molecules
 

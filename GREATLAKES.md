@@ -11,13 +11,16 @@ Work is split across two filesystems:
 /home/ymanasa/turbo/ymanasa/
 ├── miniconda3/                         # conda install (CONDA_SH)
 ├── micromamba/envs/shepherd2/          # ENV_PREFIX: the env itself
+├── micromamba/envs/boltz2/             # BOLTZ_ENV: the docking stage
 ├── opt/shepherd2/                      # upstream coleygroup/shepherd2
 └── campaigns/tgcpl-martin-campaign/scripts/ShEPhERD-for-TgCPL/   # this repo
 
 # Scratch — large, regenerable, and PURGED after ~60 days untouched.
 /scratch/maom_root/maom0/$USER/tgcpl-scratch-campaign/
 ├── SHEP_out/                           # OUTPUT_ROOT: generated molecules
+├── boltz/                              # BOLTZ_ROOT: boltz_in/, boltz_out/
 ├── intermediate_data/shep_hf_cache/    # HF_HOME: model checkpoints
+├── intermediate_data/boltz_cache/      # BOLTZ_CACHE: boltz weights
 └── logs/
 ```
 
@@ -39,7 +42,7 @@ git clone https://github.com/ymanasa2022/ShEPhERD-for-TgCPL.git \
 ```bash
 ssh greatlakes
 cd /home/ymanasa/turbo/ymanasa/campaigns/tgcpl-martin-campaign/scripts/ShEPhERD-for-TgCPL
-bash greatlakes_setup.sh cu126      # or cu124 / cu128 — see note below
+bash setup/greatlakes_setup.sh cu126   # or cu124 / cu128 — see note below
 ```
 
 Setup validates every configured path first and refuses to continue if one is
@@ -55,7 +58,7 @@ Two things that will bite if changed: the env must be **Python 3.11**
 ## 3. Smoke test (one 30-min GPU job)
 
 ```bash
-sbatch greatlakes_smoke_test.sh
+sbatch tests/greatlakes_smoke_test.sh
 ```
 
 Checks three things in order: torch sees the GPU and `xtb` is on PATH; the
@@ -66,13 +69,13 @@ instead of 8 hours into a full run.
 ## 4. Production runs
 
 ```bash
-sbatch greatlakes_tgcpl.sh          # all five
-sbatch --array=3 greatlakes_tgcpl.sh  # just run 3
+sbatch slurm_scripts/greatlakes_tgcpl.sbatch            # all five
+sbatch --array=3 slurm_scripts/greatlakes_tgcpl.sbatch  # just run 3
 ```
 
 | Task | Reference | Conditioning | Samples |
 |------|-----------|--------------|---------|
-| 1 | all 8 leads | shape+ESP+pharm | 50 each (400) |
+| 1 | all 4 leads | shape+ESP+pharm | 50 each (200) |
 | 2 | Cpd18 | shape+ESP only | 100 |
 | 3 | Cpd18 | all, grown 2–6 atoms | 100 |
 | 4 | Cpd12 | all, scaffold-fixed | 100 |
@@ -80,6 +83,17 @@ sbatch --array=3 greatlakes_tgcpl.sh  # just run 3
 
 A job array rather than one script running five jobs back to back: they run in
 parallel, each gets the full 8 h, and one failure doesn't take the rest down.
+
+## 5. Generating from Cpd12 and Cpd18
+
+```bash
+RUN_STAMP=$(date +%Y%m%d_%H%M%S) \
+    sbatch --export=ALL --array=2,4 slurm_scripts/greatlakes_redesign.sbatch
+```
+
+Task 2 is Cpd12, task 4 is Cpd18, both with P1 pinned. The shared `RUN_STAMP`
+matters: without it the array tasks stamp themselves minutes apart and stop
+looking like one campaign.
 
 ## Monitoring
 
@@ -95,13 +109,16 @@ scancel <jobid>
 These are the parts I could not check from your laptop:
 
 1. **Slurm account.** Run `my_accounts`. The `#SBATCH --account=` line in
-   `greatlakes_redesign.sh`, `greatlakes_tgcpl.sh` and
-   `greatlakes_smoke_test.sh` must match it exactly or sbatch refuses the job.
+   `slurm_scripts/greatlakes_redesign.sbatch`,
+   `slurm_scripts/greatlakes_tgcpl.sbatch`,
+   `slurm_scripts/greatlakes_selectivity.sbatch`,
+   `slurm_scripts/greatlakes_boltz_selectivity.sbatch` and
+   `tests/greatlakes_smoke_test.sh` must match it exactly or sbatch refuses the job.
    These are `#SBATCH` directives, parsed before the shell runs, so they
    **cannot** read `$ACCOUNT` from `greatlakes_config.sh` — they are the one
    place a value is duplicated. `maom0` is inferred from the scratch path
    (`/scratch/maom_root/maom0/...`); verify it.
-2. **Paths.** `bash -c 'source greatlakes_config.sh && tgcpl_check_paths'`
+2. **Paths.** `bash -c 'source setup/greatlakes_config.sh && tgcpl_check_paths'`
    prints anything missing. Everything else reads from that one file.
 3. **CUDA version.** `nvidia-smi` on a GPU node shows the driver's CUDA. Pick
    the `cu*` extra at or below it. Great Lakes `gpu` partition has V100s;
