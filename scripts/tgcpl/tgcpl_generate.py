@@ -298,6 +298,13 @@ def main() -> None:
     print(f"\n  Total valid molecules: {total}")
     print(f"  Output: {args.output_dir.resolve()}")
 
+    # Exiting 0 on an empty run makes Slurm report COMPLETED and the filter
+    # step run on nothing.
+    if total == 0:
+        print("\n  ERROR: no molecules generated", file=_sys.stderr)
+        return 1
+    return 0
+
 
 if __name__ == "__main__":
-    main()
+    _sys.exit(main())

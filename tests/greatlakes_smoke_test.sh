@@ -56,15 +56,34 @@ python examples/basic_inference/basic_inference_test.py \
     --batch-size 3
 
 echo
-echo "--- 3. real TgCPL lead, 2 samples ---"
+echo "--- 3. both campaign arms, 2 samples each ---"
+# Same flags as greatlakes_redesign.sbatch tasks 2 and 4, only smaller: a lead
+# that embeds unconstrained is no evidence the other one does, and neither
+# exercises scaffold matching or the negative atom offset.
 cd "$TGCPL_DIR"
-python "$TGCPL_PKG_DIR/tgcpl_generate.py" \
-    --ref-smiles Cpd18 \
-    --n-samples 2 \
-    --batch-size 2 \
-    --output-dir "$SCRATCH/smoke_test_tgcpl" \
-    --seed 42
+for REF in Cpd12 Cpd18; do
+    echo
+    echo ">>> $REF"
+    python "$TGCPL_PKG_DIR/tgcpl_generate.py" \
+        --ref-smiles "$REF" \
+        --n-samples 2 \
+        --batch-size 2 \
+        --condition all \
+        --scaffold-constraint \
+        --scaffold-core warhead_morpholine_p2n \
+        --add-atoms-range -6 -2 \
+        --output-dir "$SCRATCH/smoke_test_tgcpl" \
+        --seed 42 || { echo "SMOKE TEST FAILED: $REF" >&2; exit 1; }
+    # Exit 0 with nothing generated is the failure mode that reached production.
+    SDF="$SCRATCH/smoke_test_tgcpl/$REF/generated_molecules.sdf"
+    if [ ! -s "$SDF" ]; then
+        echo "SMOKE TEST FAILED: $REF produced no molecules ($SDF)" >&2
+        exit 1
+    fi
+done
 
 echo
 echo "=== Smoke test finished: $(date) ==="
-echo "If all three sections passed, submit:  sbatch slurm_scripts/greatlakes_tgcpl.sbatch"
+echo "If all three sections passed, submit:"
+echo "  RUN_STAMP=\$(date +%Y%m%d_%H%M%S) \\"
+echo "      sbatch --export=ALL --array=2,4 slurm_scripts/greatlakes_redesign.sbatch"
