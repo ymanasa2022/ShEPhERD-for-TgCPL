@@ -1,35 +1,15 @@
 #!/usr/bin/env python
 """
-baseline_scores.py — give the 3D similarity scores a scale.
+Give the 3D similarity scores a scale: a null (random MOSES-aq molecules) and
+a ceiling (the other TgCPL leads), so generated molecules land as a percentile
+rather than as a bare number.
 
-    python baseline_scores.py --ref Cpd18 --n-random 100
+Everything is scored after optimal alignment. MOSES molecules and freshly
+embedded leads are not in the reference's frame, and scoring those in place
+would give ~0 and make the null trivially easy to beat.
 
-A shape Tanimoto of 0.60 means nothing on its own. This builds the two
-reference points that make it readable:
-
-  null     random MOSES-aq molecules scored against the reference. What an
-           unrelated molecule gets. Conditioning has to beat this.
-  ceiling  the other TgCPL leads scored against the reference. These are real
-           actives from the same series, so they show what a genuine analogue
-           of the reference scores — the realistic target, not 1.0.
-
-Generated molecules then land as a percentile of the null rather than as a
-bare number.
-
-Alignment
----------
-Everything is scored after optimal alignment to the reference. Generated
-molecules come out already in the reference's frame, but MOSES molecules and
-freshly embedded leads do not, and scoring those in place would give ~0 and
-make the null flatteringly easy to beat. Aligning everything is the honest
-comparison; it biases *against* the generated set, which is the right
-direction for a sanity check.
-
-Size matching
--------------
-Shape Tanimoto rises with similarity in size, so an unmatched null measures
-the size effect instead of conditioning. --size-tol keeps null molecules
-within a heavy-atom window of the reference.
+The null is size-matched (--size-tol): shape Tanimoto rises with similarity in
+size, so an unmatched null measures size rather than conditioning.
 """
 
 import argparse
@@ -45,7 +25,7 @@ from shepherd_score.score.constants import ALPHA
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # tgcpl lives under scripts/
 
 from tgcpl.conformers import embed_lead  # noqa: E402
 from tgcpl.leads import LEADS  # noqa: E402
@@ -59,12 +39,7 @@ MOSES_PKL = Path("../shepherd2/data/conformers/moses_aq/moses_test_scaffold_molb
 def aligned_scores(ref_molec: Molecule, fit_mol: Chem.Mol, alpha: float,
                    num_repeats: int = 20, verbose: bool = False
                    ) -> tuple[float | None, float | None]:
-    """
-    Best-alignment shape and pharmacophore similarity of fit_mol to the reference.
-
-    align_with_* returns the transformed coordinates; the Tanimoto it achieved is
-    left on the pair as sim_aligned_surf / sim_aligned_pharm.
-    """
+    """align_with_* returns coordinates; the Tanimoto is left on the pair."""
     try:
         fit_molec = Molecule(
             fit_mol,
@@ -134,7 +109,7 @@ def main() -> None:
     ref_molec = Molecule(ref_mol, num_surf_points=NUM_SURF_POINTS, pharm_multi_vector=False)
     print(f"  heavy atoms: {ref_heavy}\n")
 
-    # --- ceiling: the other leads, real actives from the same series ---
+    # Ceiling: the other leads, real actives from the same series.
     print("CEILING — other TgCPL leads vs reference")
     ceiling = []
     for name, lead in LEADS.items():
@@ -158,7 +133,6 @@ def main() -> None:
               f"   (TgCPL IC50 {lead['tgcpl_ic50_nM']} nM)")
     print()
 
-    # --- null: size-matched random MOSES molecules ---
     print(f"NULL — random MOSES-aq molecules (+/- {args.size_tol} heavy atoms)")
     pool = load_moses(args.moses_pkl, args.n_random * 4)
     sized = [m for m in pool

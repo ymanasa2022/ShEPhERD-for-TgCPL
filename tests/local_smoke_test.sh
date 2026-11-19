@@ -1,14 +1,7 @@
 #!/usr/bin/env bash
-# =============================================================================
-# local_smoke_test.sh — prove the install works on this Mac, on CPU.
-#
-#   ./local_smoke_test.sh            # stages 1-2 (~5 min)
-#   ./local_smoke_test.sh tgcpl      # stage 3 only: one real lead, 1 sample (~4 min)
-#   ./local_smoke_test.sh all        # everything (~9 min)
-#
-# The laptop counterpart of greatlakes_smoke_test.sh. Run this before pushing
-# anything to Great Lakes: it catches env breakage without burning GPU hours.
-# =============================================================================
+# Prove the install works on this Mac, on CPU. Run before pushing to Great
+# Lakes: catches env breakage without burning GPU hours.
+# Stage arg: default (1-2), tgcpl (stage 3 only), all.
 
 set -euo pipefail
 
@@ -27,7 +20,6 @@ echo
 
 run_stage() { [[ "$STAGE" == "all" || "$STAGE" == "$1" || ( "$STAGE" == "default" && "$2" == "yes" ) ]]; }
 
-# --- 1. imports and tools ----------------------------------------------------
 if run_stage env yes; then
 echo "--- 1. environment ---"
 python - <<'PY'
@@ -46,7 +38,6 @@ echo "PASS: environment"
 echo
 fi
 
-# --- 2. shepherd2 end-to-end, benzene ----------------------------------------
 if run_stage benzene yes; then
 echo "--- 2. shepherd2 end-to-end (benzene, 3 samples, CPU ~3-4 min) ---"
 python "$REPO_DIR/examples/basic_inference/basic_inference_test.py" \
@@ -57,9 +48,8 @@ echo "PASS: benzene (expect 3/3 valid)"
 echo
 fi
 
-# --- 3. a real TgCPL lead ----------------------------------------------------
-# Bigger than benzene but still a few minutes on CPU. This is the correctness
-# check for tgcpl_generate.py itself: conformer embedding, xTB profile, generation.
+# The correctness check for tgcpl_generate.py itself: conformer embedding,
+# xTB profile, generation.
 if run_stage tgcpl no; then
 echo "--- 3. tgcpl_generate.py (Cpd18, 1 sample, CPU ~3-4 min) ---"
 cd "$TGCPL_DIR"

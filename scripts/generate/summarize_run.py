@@ -1,18 +1,7 @@
 #!/usr/bin/env python
 """
-summarize_run.py — read a tgcpl_generate.py output directory and report what
-came out of it.
-
-    python summarize_run.py local_outputs/run_cpd18_n10
-
-tgcpl_generate.py writes an SDF and a SMILES file per reference but no summary,
-so this answers the first questions you have about a run: how many molecules are
-unique, how close they stay to the lead, and whether they look drug-like.
-
-Tanimoto here is Morgan/ECFP4 against the reference lead. High similarity means
-the model stayed near the lead; low means it wandered. Neither is automatically
-good, but a run that returns the reference over and over is not giving you
-anything, and that is easy to miss by eye.
+Read a tgcpl_generate.py output directory and report uniqueness, Morgan/ECFP4
+Tanimoto to the reference lead, and drug-likeness.
 """
 
 import argparse
@@ -30,7 +19,7 @@ RDLogger.DisableLog("rdApp.*")
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # tgcpl lives under scripts/
 
 from tgcpl.leads import LEADS  # noqa: E402
 
@@ -38,10 +27,8 @@ _FPGEN = GetMorganGenerator(radius=2, fpSize=2048)
 
 NUM_SURF_POINTS = 400
 
-# These leads are covalent inhibitors: the nitrile is the electrophile that
-# reacts with the catalytic cysteine. A generated molecule that has dropped it
-# is not a covalent inhibitor at all, however well it scores on shape, so
-# warhead retention is the first thing to check in any unconstrained run.
+# The nitrile is the electrophile that reacts with the catalytic cysteine; a
+# molecule that dropped it is not a covalent inhibitor, however well it scores.
 WARHEAD_PATTERNS = {
     "nitrile": "C#N",
     "triazine": "c1ncncn1",
@@ -55,22 +42,14 @@ def fp(mol):
 
 def score_3d(ref_mol_3d, gen_mols_3d, pharm_multi_vector: bool = False):
     """
-    Shape / ESP / pharmacophore similarity of each generated molecule to the
-    reference, scored in the pose as generated.
+    Shape / ESP / pharmacophore similarity, scored in the pose as generated.
 
-    This is the number that says whether conditioning worked. ShEPhERD generates
-    into the reference's own frame, so no alignment is done here — the same
-    choice ConditionalEval makes for its `sim_*_target` scores. Both reference
-    and generated molecules come out centered at the origin, so the poses are
-    comparable without alignment — worth re-checking if either side changes.
+    No alignment: ShEPhERD generates into the reference's frame and both sides
+    come out centered at the origin. Re-check if either side changes.
 
-    Two reasons these read slightly low. Partial charges fall back to MMFF94
-    rather than xTB, so ESP is approximate. And reference.sdf is the MMFF
-    geometry, while generation conditioned on the xTB-relaxed profile, so the
-    reference here is a near copy of the true target rather than the target itself.
-    This is a screen for "is conditioning working", not a publication number.
-
-    Returns a list of (surf, esp, pharm) tuples, any element possibly None.
+    Reads low by design — MMFF94 charges rather than xTB, and reference.sdf is
+    the MMFF geometry while generation used the xTB-relaxed profile. A screen
+    for "is conditioning working", not a publication number.
     """
     from shepherd_score.container import Molecule
     from shepherd_score.score.constants import ALPHA, LAM_SCALING
@@ -125,13 +104,12 @@ def score_3d(ref_mol_3d, gen_mols_3d, pharm_multi_vector: bool = False):
 
 
 def summarize_ref(ref_dir: Path, do_3d: bool = True) -> dict | None:
-    """Summarize one reference's subdirectory. Returns None if it has no SDF."""
+    """Returns None if the directory has no SDF."""
     sdf = ref_dir / "generated_molecules.sdf"
     if not sdf.exists():
         return None
 
-    # Keep hydrogens for 3D scoring; drop them for SMILES so the strings are
-    # readable and two molecules differing only in H placement count as one.
+    # Keep H for 3D scoring; drop for SMILES so H-placement duplicates collapse.
     mols_3d = [m for m in Chem.SDMolSupplier(str(sdf), removeHs=False) if m is not None]
     mols = [Chem.RemoveHs(m) for m in mols_3d]
     if not mols:
@@ -141,7 +119,6 @@ def summarize_ref(ref_dir: Path, do_3d: bool = True) -> dict | None:
     smis = [Chem.MolToSmiles(m) for m in mols]
     unique = sorted(set(smis))
 
-    # One representative 3D conformer per unique SMILES, for the 3D scores.
     rep_3d = {}
     for smi, m3 in zip(smis, mols_3d):
         rep_3d.setdefault(smi, m3)
@@ -157,7 +134,6 @@ def summarize_ref(ref_dir: Path, do_3d: bool = True) -> dict | None:
         if gen_mols:
             sims = BulkTanimotoSimilarity(fp(ref_mol), [fp(m) for m in gen_mols])
 
-    # 3D similarity to the reference, in the pose as generated.
     scores_3d = {}
     ref_sdf = ref_dir / "reference.sdf"
     if do_3d and ref_sdf.exists():
@@ -200,11 +176,8 @@ def summarize_ref(ref_dir: Path, do_3d: bool = True) -> dict | None:
             if c:
                 print(f"  3D {label} vs ref : min {min(c):.2f} | mean {sum(c)/len(c):.2f} | max {max(c):.2f}")
 
-        # At shepherd_score's default lam (0.3 * LAM_SCALING ~ 62) the ESP damping
-        # term exp(-dESP^2/lam) sits at ~0.997 for ESP magnitudes of order 1, which
-        # is what these molecules give. Measured directly: flipping the sign of a
-        # generated molecule's entire ESP moved the score by 0.001. So ESP here is
-        # the shape score relabelled, not independent evidence. Say so rather than
+        # At the default lam (~62) the ESP damping term is ~0.997 for these
+        # molecules, so ESP is the shape score relabelled. Flag that rather than
         # printing a column that looks like a second opinion.
         pairs = [(v[0], v[1]) for v in scores_3d.values() if v[0] is not None and v[1] is not None]
         if pairs:

@@ -1,14 +1,5 @@
-"""
-tests/test_redesign.py
-======================
-Pre-flight for the scaffold cores and property filter, so a typo does not cost
-an 8-hour GPU job.
-
-  python tests/test_redesign.py          # ~5 s, RDKit only -- no torch, no GPU
-  python tests/test_redesign.py --full   # adds a real 2-sample generation
-
-Does NOT check that generation is numerically well-behaved at reduced N_x1;
-only --full touches the model, and lightly.
+"""Pre-flight for the scaffold cores and property filter, so a typo does not
+cost an 8-hour GPU job. --full adds a real 2-sample generation.
 """
 
 from __future__ import annotations
@@ -48,9 +39,6 @@ def section(title: str) -> None:
     print(f"\n--- {title} " + "-" * max(0, 62 - len(title)))
 
 
-# =============================================================================
-# 1-2. scaffold cores
-# =============================================================================
 def test_cores() -> None:
     section("1. scaffold cores pin the right atoms")
 
@@ -92,9 +80,6 @@ def test_cores() -> None:
                 check(f"{lead} / {core}: free groups on P2 nitrogen", len(free), 2)
 
 
-# =============================================================================
-# 3. N_x1 sizing
-# =============================================================================
 def test_sizing() -> None:
     section("3. negative --add-atoms-range parses and sizes correctly")
 
@@ -106,7 +91,7 @@ def test_sizing() -> None:
         got = "ARGPARSE REJECTED"
     check("space-separated negatives parse", got, [-6, -2])
 
-    # The '=' form is a footgun; confirm the job scripts' warning stays true.
+    # Confirm the job scripts' "=" warning stays true.
     try:
         p.parse_args(["--add-atoms-range=-6", "-2"])
         eq_ok = True
@@ -126,9 +111,6 @@ def test_sizing() -> None:
               f"{est_lo:.0f}-{est_hi:.0f} Da", "< 500", ok=est_hi < 500)
 
 
-# =============================================================================
-# 4. filter verdicts on known molecules
-# =============================================================================
 def test_filter_logic() -> None:
     section("4. filter verdicts on molecules with known answers")
 
@@ -169,13 +151,10 @@ def test_filter_logic() -> None:
     check("thresholds() rejects an unknown key", typo_caught, True)
 
 
-# =============================================================================
-# 5. filter end-to-end: does it write what downstream docking needs?
-# =============================================================================
 def test_filter_io() -> None:
     section("5. filter writes passing.smi and passing.sdf")
 
-    # Two molecules that pass at MW<=500, one that fails on MW.
+    # Two pass at MW<=500, one fails on MW.
     smis = [leads.LEADS["Cpd12"]["smiles"],
             leads.LEADS["Cpd1"]["smiles"],
             leads.LEADS["Cpd18"]["smiles"]]
@@ -213,9 +192,6 @@ def test_filter_io() -> None:
             check("passing.sdf carries 3D conformers", has_3d, True)
 
 
-# =============================================================================
-# 6. optional: a real 2-sample generation
-# =============================================================================
 def test_generation(device: str) -> None:
     section(f"6. live 2-sample generation on {device} (slow)")
 
@@ -254,6 +230,7 @@ def test_generation(device: str) -> None:
                     print(f"        -> MW {Descriptors.MolWt(Chem.RemoveHs(m)):.1f}, "
                           f"rotB {rdmd.CalcNumRotatableBonds(m)}, "
                           f"{Chem.MolToSmiles(Chem.RemoveHs(m))[:60]}")
+
 
 
 def main() -> None:

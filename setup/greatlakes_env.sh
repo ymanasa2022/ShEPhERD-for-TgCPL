@@ -1,10 +1,6 @@
 #!/usr/bin/env bash
-# =============================================================================
-# greatlakes_env.sh — activate the environment. Sourced by every job script.
-#   source greatlakes_env.sh
-#
-# Paths live in greatlakes_config.sh; edit them there, not here.
-# =============================================================================
+# Activate the environment. Sourced by every job script; paths live in
+# greatlakes_config.sh.
 
 _GL_ENV_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$_GL_ENV_DIR/greatlakes_config.sh"
@@ -15,7 +11,8 @@ if ! tgcpl_check_paths; then
     return 1 2>/dev/null || exit 1
 fi
 
-# Explicit hook: `conda info --base` picks up whatever conda is on PATH.
+# Source the hook explicitly: the inherited CONDA_EXE points at a dead mount,
+# so `conda info --base` resolves to nothing usable.
 source "$CONDA_SH"
 conda activate "$ENV_PREFIX"
 

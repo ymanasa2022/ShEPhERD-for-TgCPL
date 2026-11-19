@@ -1,41 +1,8 @@
-"""
-tgcpl_generate.py
-=================
-ShEPhERD-2 generation script tailored for TgCPL-selective covalent inhibitors.
+"""ShEPhERD-2 generation of TgCPL-selective covalent inhibitors.
 
-Design rationale (from TgCPL Main Draft 6):
---------------------------------------------
-TgCPL vs. HsCPL differ in 4 active-site residues within 4.5 Å of the substrate:
-  TgCPL:  Gln69,  Glu75,  Asp78,  Asp218   (acidic/polar S2 pocket)
-  HsCPL:  Leu69,  Tyr72,  Glu63,  Ala214   (hydrophobic S2 pocket)
-
-Key design goals:
-  1. POTENCY    : maintain covalent bond to Cys31; P2 basic amine contacts
-                  Glu75 / Asp218 in the acidic TgCPL S2 pocket
-  2. SELECTIVITY: large (6-7 membered) cycloalkyl at benzylic P3 carbon
-                  blocks 4-fluorobenzyl from fitting HsCPL's hydrophobic S2
-  3. NOVEL IDEAS: explore bioisosteres of morpholine (P1), replace 4-F-benzyl
-                  with other S3-fitting aryl groups, vary the P2 basic chain
-
-ShEPhERD strategy:
-  - Use Cpd12 (629 nM / 37x selective) and Cpd18 (210 nM / 39x selective)
-    as primary interaction-profile references
-  - Generate molecules conditioned on their SHAPE + ESP + PHARMACOPHORES
-  - Optionally neutralise ESP to explore bioisosteres across different charge states
-  - Use --add-atoms to explore larger P3 / extended P2 derivatives
-  - Scaffold constraint: fix the triazine-morpholine-CN warhead core atoms
-  - DUAL-TARGET selectivity run: condition ON TgCPL profile AND NOT HsCPL profile
-    using generate_composition() with weights [+0.5, -0.5]. This directly encodes
-    "look like Cpd18 in TgCPL, avoid looking like Cpd1 in HsCPL."
-
-Usage:
-  conda activate shepherd2
-  python tgcpl_generate.py                           # default: all references
-  python tgcpl_generate.py --ref-smiles Cpd12        # single reference
-  python tgcpl_generate.py --n-samples 100           # more samples
-  python tgcpl_generate.py --condition shape esp      # shape+ESP only (no pharm)
-  python tgcpl_generate.py --add-atoms 5 10          # grow molecule by 5-10 atoms
-  python tgcpl_generate.py --dual-target             # TgCPL AND NOT HsCPL composition
+Selectivity comes from the S2 pocket: TgCPL is acidic (Glu75/Asp218), HsCPL
+hydrophobic (Leu69/Ala214). Runs condition on a lead's shape/ESP/pharmacophore
+profile; --dual-target instead conditions ON TgCPL AND NOT HsCPL.
 """
 
 from __future__ import annotations
@@ -93,7 +60,6 @@ def run_generation(
     seed: int,
 ) -> list[Chem.Mol]:
     """Generate molecules conditioned on one reference lead."""
-
     ref_dir = output_dir / ref_name
     ref_dir.mkdir(parents=True, exist_ok=True)
 
@@ -103,21 +69,19 @@ def run_generation(
     print(f"  Condition: {condition} | n_samples={n_samples}")
     print(f"{'='*60}")
 
-    # Embed reference
     print("  Embedding reference conformer...")
     ref_mol = embed_lead(ref_smiles, seed=seed)
     if ref_mol is None:
         print(f"  ERROR: Could not embed {ref_name}")
         return []
 
-    # Save reference SDF
     ref_sdf = ref_dir / "reference.sdf"
     writer = Chem.SDWriter(str(ref_sdf))
     writer.write(ref_mol)
     writer.close()
 
-    # Scaffold constraint (optional): fix the core atoms. This has to be decided
-    # before profile extraction, because the atom indices go into the profile.
+    # Must be decided before profile extraction: the atom indices go into the
+    # profile.
     scaffold_atom_indices = None
     if use_scaffold_constraint:
         scaffold_atom_indices = get_scaffold_atom_indices(ref_mol, scaffold_core)
@@ -126,7 +90,6 @@ def run_generation(
         else:
             print("  WARNING: Scaffold atoms not matched; running unconstrained")
 
-    # Extract interaction profile (shape + ESP + pharmacophores)
     print("  Extracting interaction profile (xTB)...")
     profile = extract_interaction_profile(
         ref_mol,
@@ -138,7 +101,6 @@ def run_generation(
         print(f"  ERROR: Could not extract interaction profile for {ref_name}")
         return []
 
-    # Generate
     print(f"  Generating {n_samples} samples (batch_size={batch_size})...")
     t0 = time.perf_counter()
 
@@ -152,9 +114,9 @@ def run_generation(
     if scaffold_atom_indices:
         gen_kwargs["scaffold_conditioning"] = True
 
-    # "Grow" the molecule by asking for more atoms/pharmacophores than the
-    # reference has. generate() takes the counts directly (per-sample lists are
-    # allowed), so the range is sampled here rather than passed through.
+    # Growing means asking for more atoms/pharmacophores than the reference
+    # has. generate() takes the counts directly (per-sample lists allowed), so
+    # the range is sampled here rather than passed through.
     grow_atoms = add_atoms_min != 0 or add_atoms_max != 0
     grow_pharms = add_pharms_min != 0 or add_pharms_max != 0
     rng = np.random.default_rng(seed)
@@ -177,7 +139,6 @@ def run_generation(
         samples = model.generate(**gen_kwargs)
         n_generated += len(samples)
 
-        # Convert to RDKit mols via xTB relaxation
         mol_charges = mol_charges_from_samples(
             samples, xtb_optimize=True, xtb_timeout=180, verbose=False
         )
@@ -185,7 +146,6 @@ def run_generation(
         all_mols.extend(batch_mols)
         print(f"    Batch done: {len(batch_mols)}/{this_batch} valid")
 
-        # Save batch samples (raw)
         pkl_path = ref_dir / f"samples_batch_{n_generated}.pkl"
         with open(pkl_path, "wb") as f:
             pickle.dump(samples, f)
@@ -193,7 +153,6 @@ def run_generation(
     elapsed = time.perf_counter() - t0
     print(f"  Total time: {elapsed:.1f}s | Valid mols: {len(all_mols)}/{n_samples}")
 
-    # Save all valid molecules
     if all_mols:
         out_sdf = ref_dir / "generated_molecules.sdf"
         writer = Chem.SDWriter(str(out_sdf))
@@ -227,41 +186,9 @@ def run_dual_target_selectivity(
     output_dir: Path,
     seed: int,
 ) -> list[Chem.Mol]:
-    """
-    Dual-target selectivity run using ShEPhERD-2 compositional generation.
-
-    Strategy: condition ON the TgCPL lead's interaction profile AND NOT the HsCPL
-    reference's profile. ShEPhERD uses weights [+0.5, -0.5] with
-    composition_mode='conditional', which steers generation toward TgCPL-matching
-    molecules that simultaneously avoid the HsCPL electrostatic/shape profile.
-
-    This directly exploits:
-      - TgCPL's acidic S2 (Glu75, Asp218) → encoded in the positive TgCPL ESP profile
-      - HsCPL's hydrophobic S2 (Leu69, Ala214) → negated by the negative HsCPL weight
-      - The deeper, narrower TgCPL S2 → encoded in the positive shape profile
-
-    The two references are aligned by ESP similarity before profile extraction, so
-    they share a common 3D reference frame.
-
-    Parameters
-    ----------
-    tgcpl_ref_name : str
-        Label for the TgCPL reference (positive target), e.g. "Cpd18"
-    tgcpl_smiles : str
-        SMILES of the TgCPL-selective lead (e.g. Cpd18: best potency + selectivity)
-    hscpl_ref_name : str
-        Label for the HsCPL reference (anti-target), e.g. "Cpd1"
-    hscpl_smiles : str
-        SMILES of a compound with good HsCPL activity (e.g. Cpd1: selectivity 7x,
-        high HsCPL engagement) — provides the HsCPL interaction profile to avoid
-    model : ShEPhERD model
-    n_samples : int
-    batch_size : int
-    use_scaffold_constraint : bool
-        If True, fixes the triazine-CN-morpholine warhead from the TgCPL reference
-    output_dir : Path
-    seed : int
-    """
+    """Condition ON the TgCPL lead's profile AND NOT the HsCPL reference's,
+    via generate_composition with weights [+0.5, -0.5]. The two references are
+    aligned by ESP similarity first, so they share one 3D frame."""
     run_label = f"dual_{tgcpl_ref_name}_AND_NOT_{hscpl_ref_name}"
     ref_dir = output_dir / run_label
     ref_dir.mkdir(parents=True, exist_ok=True)
@@ -273,7 +200,6 @@ def run_dual_target_selectivity(
     print(f"  n_samples={n_samples}")
     print(f"{'='*60}")
 
-    # --- 1. Embed both references ---
     print("  Embedding TgCPL reference...")
     tgcpl_mol = embed_lead(tgcpl_smiles, seed=seed)
     if tgcpl_mol is None:
@@ -286,9 +212,7 @@ def run_dual_target_selectivity(
         print(f"  ERROR: Could not embed HsCPL reference ({hscpl_ref_name})")
         return []
 
-    # --- 2. Align hscpl_mol onto tgcpl_mol by ESP similarity ---
-    # This puts both molecules in the same 3D frame, required for composition.
-    # We align HsCPL onto TgCPL so the TgCPL molecule is the anchor frame.
+    # Composition requires one 3D frame; TgCPL is the anchor.
     print("  Aligning HsCPL reference onto TgCPL frame (ESP alignment)...")
     _, hscpl_mol_aligned = align_two_ref_mol_from_mol_charge(
         mol_to_align_mol=hscpl_mol,
@@ -298,13 +222,11 @@ def run_dual_target_selectivity(
     )
     print("  Alignment done.")
 
-    # Save reference SDFs for inspection
     for mol, name in [(tgcpl_mol, "tgcpl_ref.sdf"), (hscpl_mol_aligned, "hscpl_ref_aligned.sdf")]:
         writer = Chem.SDWriter(str(ref_dir / name))
         writer.write(mol)
         writer.close()
 
-    # --- 3. Extract interaction profiles ---
     print("  Extracting TgCPL interaction profile (xTB)...")
     profile_tgcpl = extract_interaction_profile(tgcpl_mol, xtb_optimize=True, center=True)
     if profile_tgcpl is None:
@@ -317,7 +239,7 @@ def run_dual_target_selectivity(
         print("  ERROR: Could not extract HsCPL interaction profile")
         return []
 
-    # Re-translate profile_hscpl into TgCPL frame (same COM reference)
+    # Re-translate into the TgCPL frame: extraction re-centred each profile.
     profile_hscpl.translated(
         profile_tgcpl.com_before_centering - profile_hscpl.com_before_centering
     )
@@ -325,7 +247,6 @@ def run_dual_target_selectivity(
     print(f"  TgCPL profile: n_atoms={profile_tgcpl.n_atoms}, n_pharms={profile_tgcpl.n_pharms}")
     print(f"  HsCPL profile: n_atoms={profile_hscpl.n_atoms}, n_pharms={profile_hscpl.n_pharms}")
 
-    # --- 4. Scaffold constraint (optional) ---
     scaffold_condition = None
     if use_scaffold_constraint:
         core_atom_inds = get_scaffold_atom_indices(tgcpl_mol, scaffold_core)
@@ -335,9 +256,8 @@ def run_dual_target_selectivity(
         else:
             print("  WARNING: Scaffold not matched; running without constraint")
 
-    # --- 5. Compositional generation ---
-    # weights = [+0.5, -0.5]:  satisfy TgCPL AND NOT HsCPL
-    # composition_mode='conditional': best for AND NOT (from ShEPhERD-2 tutorial)
+    # [+0.5, -0.5] = TgCPL AND NOT HsCPL; 'conditional' is the mode the
+    # ShEPhERD-2 tutorial recommends for AND NOT.
     weights = np.array([0.5, -0.5])
     N_edm = 400  # default EDM steps
     early_stop = int(0.9 * N_edm)
@@ -367,13 +287,11 @@ def run_dual_target_selectivity(
         all_samples.extend(samples)
         n_generated += len(samples)
 
-        # Save raw batch
         pkl_path = ref_dir / f"samples_batch_{n_generated}.pkl"
         with open(pkl_path, "wb") as f:
             pickle.dump(samples, f)
         print(f"    Batch done: {len(samples)} samples")
 
-    # --- 6. Convert to RDKit molecules ---
     print("  Converting samples to RDKit molecules (xTB relaxation)...")
     mol_charges = mol_charges_from_samples(
         all_samples, xtb_optimize=True, xtb_timeout=180, verbose=False
@@ -383,7 +301,6 @@ def run_dual_target_selectivity(
 
     print(f"  Total time: {elapsed:.1f}s | Valid mols: {len(all_mols)}/{n_samples}")
 
-    # --- 7. Save outputs ---
     if all_mols:
         out_sdf = ref_dir / "generated_molecules.sdf"
         writer = Chem.SDWriter(str(out_sdf))
@@ -401,7 +318,6 @@ def run_dual_target_selectivity(
         )
         print(f"  Saved: {out_smi}")
 
-        # Write run summary
         (ref_dir / "run_info.txt").write_text(
             f"Dual-target selectivity run\n"
             f"Positive target: {tgcpl_ref_name} (TgCPL, weight=+0.5)\n"
@@ -502,13 +418,11 @@ def main() -> None:
     if device == "cpu":
         print("WARNING: CPU inference is very slow. GPU strongly recommended.")
 
-    # Determine which leads to run
     if args.ref_smiles == "all":
         refs_to_run = list(LEADS.keys())
     else:
         refs_to_run = [args.ref_smiles]
 
-    # Condition string: "all" or "shape+esp" etc.
     condition_str = args.condition[0] if len(args.condition) == 1 else "+".join(args.condition)
 
     print(f"\nTgCPL generation run:")
@@ -520,7 +434,7 @@ def main() -> None:
           + (f" ({args.scaffold_core})" if args.scaffold_constraint else ""))
     print(f"  Extra atoms range: {args.add_atoms_range}")
 
-    # Load model (downloads weights from HuggingFace on first run)
+    # Downloads weights from HuggingFace on first run.
     print("\nLoading ShEPhERD-2 model...")
     model = load_model(device=device)
 
@@ -528,7 +442,6 @@ def main() -> None:
 
     all_results = {}
 
-    # --- Standard single-reference runs ---
     for ref_name in refs_to_run:
         lead = LEADS[ref_name]
         mols = run_generation(
@@ -551,7 +464,6 @@ def main() -> None:
         )
         all_results[ref_name] = mols
 
-    # --- Dual-target selectivity run (TgCPL AND NOT HsCPL) ---
     if args.dual_target:
         tgcpl_lead = LEADS[args.dual_tgcpl_ref]
         hscpl_lead = LEADS[args.dual_hscpl_ref]

@@ -1,18 +1,7 @@
 #!/usr/bin/env bash
-# =============================================================================
-# compare_scaffold.sh — same lead, same seed, two scaffold cores.
-#
-#   ./compare_scaffold.sh [N_SAMPLES] [REF]      # defaults: 6 Cpd18
-#
-# The only difference between the two runs is which atoms are held fixed:
-#
-#   warhead_morpholine   nitrile + triazine + P1 morpholine   (14/37 atoms on Cpd18)
-#   warhead              nitrile + triazine only              ( 8/37)
-#
-# Freeing the morpholine should let S1 vary. Whether it actually does — and at
-# what cost to the 3D scores — is what this is for. Same seed both sides, so
-# differences are the constraint, not sampling noise.
-# =============================================================================
+# Same lead, same seed, two scaffold cores: warhead_morpholine holds the
+# nitrile + triazine + P1 morpholine fixed, warhead only the first two. Same
+# seed both sides, so differences are the constraint, not sampling noise.
 
 set -euo pipefail
 

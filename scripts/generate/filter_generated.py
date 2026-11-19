@@ -1,25 +1,9 @@
 """
-filter_generated.py
-===================
-Post-generation triage for tgcpl_generate.py output.
+Post-generation triage for tgcpl_generate.py output: dedupe, then mechanism,
+size, flexibility, ring-size, property and PAINS filters.
 
-Applies, in order:
-  1. parse + dedupe by canonical SMILES
-  2. MECHANISM  : nitrile and triazine must survive -- generation conditions
-                  on a 3D field, so it is free to drop them
-  3. SIZE       : MW ceiling
-  4. FLEXIBILITY: rotatable-bond ceiling
-  5. RINGS      : max ring size -- rejects macrocycles and other oversized rings
-  6. PROPERTIES : rule-based developability filters (Lipinski / Veber)
-  7. PAINS      : RDKit FilterCatalog assay-interference substructures
-
-NOTE: rule-based physicochemistry, not ADMET prediction. A pass means "not
-obviously disqualified". Real endpoints need a trained predictor.
-
-Usage:
-  python filter_generated.py tgcpl_outputs/run_vmcc5199_mw400
-  python filter_generated.py <dir> --max-mw 400 --max-rotb 7 --max-ring-size 7
-  python filter_generated.py <dir> --no-pains --out passing.smi
+Rule-based physicochemistry, not ADMET prediction: a pass means "not obviously
+disqualified". Real endpoints need a trained predictor.
 """
 
 from __future__ import annotations
@@ -30,7 +14,7 @@ from pathlib import Path
 
 from rdkit import Chem, RDLogger
 
-# tgcpl sits beside this file's directory, under scripts/.
+# tgcpl lives under scripts/.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from tgcpl.properties import (  # noqa: E402
@@ -85,7 +69,6 @@ def main() -> None:
 
     pains = pains_catalog() if args.pains else None
 
-    # ---- load + dedupe -----------------------------------------------------
     seen: dict[str, Chem.Mol] = {}
     n_raw = 0
     for sdf in sdfs:
@@ -109,7 +92,6 @@ def main() -> None:
           f"HBD<={args.max_hbd}  HBA<={args.max_hba}  TPSA<={args.max_tpsa:g}"
           f"{'  +PAINS' if pains else ''}")
 
-    # ---- filter ------------------------------------------------------------
     passing, rejected = [], []
     tally: dict[str, int] = {}
     for smi, mol in seen.items():
@@ -146,7 +128,7 @@ def main() -> None:
                 fh.write(f"{smi}\tMW={d['mw']:.1f}\tQED={d['qed']:.2f}\n")
         print(f"\nWrote {len(passing)} SMILES -> {out}")
 
-        # 3D SDF for docking: xTB-relaxed coords, no re-embedding needed.
+        # xTB-relaxed coords, so docking needs no re-embedding.
         out_sdf = args.out_sdf or base / "passing.sdf"
         w = Chem.SDWriter(str(out_sdf))
         for smi, mol, d, _ in passing:

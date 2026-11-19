@@ -1,16 +1,6 @@
 #!/usr/bin/env bash
-# =============================================================================
-# setup_shepherd2.sh — install ShEPhERD-2 on a generic HPC or workstation.
-#
-# ON GREAT LAKES USE setup/greatlakes_setup.sh INSTEAD -- it reads its paths
-# from greatlakes_config.sh. This is the portable fallback: edit the paths
-# below, then run it.
-#
-#   bash setup/setup_shepherd2.sh            # default CUDA build
-#   bash setup/setup_shepherd2.sh cu124      # pick another
-#
-# Idempotent: safe to re-run.
-# =============================================================================
+# Install ShEPhERD-2 on a generic HPC or workstation; idempotent.
+# On Great Lakes use setup/greatlakes_setup.sh instead.
 
 set -euo pipefail
 
@@ -43,10 +33,9 @@ if [ ! -f "$CONDA_SH" ]; then
     exit 1
 fi
 
-# Explicit hook: a non-interactive shell has no conda function.
+# Source the hook explicitly: a non-interactive shell has no conda function.
 source "$CONDA_SH"
 
-# --- 1. repo ---------------------------------------------------------------
 if [ -d "$REPO_DIR/.git" ]; then
     echo "[1/4] Repo exists — pulling..."
     git -C "$REPO_DIR" pull --ff-only
@@ -56,9 +45,8 @@ else
     git clone https://github.com/coleygroup/shepherd2.git "$REPO_DIR"
 fi
 
-# --- 2. environment --------------------------------------------------------
-# python<3.12 is required by shepherd. xtb must come from conda-forge: it is
-# not pip-installable, and generation dies mid-run without it.
+# Must be python 3.11. xtb must come from conda-forge: it is not
+# pip-installable, and generation dies mid-run without it.
 if [ -d "$ENV_PREFIX" ]; then
     echo "[2/4] Env exists at $ENV_PREFIX — skipping create."
 else
@@ -79,14 +67,12 @@ if [ "$_py_prefix" != "$ENV_PREFIX" ]; then
 fi
 echo "      active python: $(python -V 2>&1) at $_py_prefix"
 
-# --- 3. shepherd2 ----------------------------------------------------------
 echo "[3/4] Installing shepherd2 [$CUDA_EXTRA]..."
 cd "$REPO_DIR"
 pip install --quiet uv
 # No --system: install into the active conda prefix, not the base interpreter.
 uv pip install -e ".[${CUDA_EXTRA}]"
 
-# --- 4. verify -------------------------------------------------------------
 echo "[4/4] Verifying..."
 python - <<'PY'
 import shutil, sys, torch

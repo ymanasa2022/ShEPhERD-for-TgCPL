@@ -1,11 +1,7 @@
-"""
-tgcpl -- shared logic for TgCPL-selective inhibitor generation with ShEPhERD-2.
+"""Shared logic for TgCPL-selective inhibitor generation with ShEPhERD-2.
 
-  leads       reference compounds, registry-id lookup
-  scaffolds   scaffold cores for --scaffold-constraint
-  properties  rule-based descriptors and triage thresholds
-  conformers  3D embedding -- NOT re-exported, since importing it pulls in
-              shepherd and torch. Use `from tgcpl.conformers import embed_lead`.
+conformers is deliberately not re-exported: importing it pulls in shepherd and
+torch. Use `from tgcpl.conformers import embed_lead`.
 """
 
 from __future__ import annotations

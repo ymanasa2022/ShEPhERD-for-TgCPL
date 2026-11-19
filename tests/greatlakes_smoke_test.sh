@@ -1,9 +1,5 @@
 #!/usr/bin/env bash
-# =============================================================================
-# greatlakes_smoke_test.sh — short GPU job proving the install works.
-# Submit:  sbatch tests/greatlakes_smoke_test.sh
-# Run this BEFORE the big jobs; it costs ~10 min of one GPU.
-# =============================================================================
+# Short GPU job proving the install works. Run before the big jobs.
 #SBATCH --job-name=tgcpl_smoke
 #SBATCH --account=maom0          # must match your Slurm account: run `my_accounts`
 #SBATCH --partition=gpu
@@ -44,8 +40,8 @@ PY
 
 echo
 echo "--- 2. shepherd2 end-to-end (benzene, 3 samples) ---"
-# Uses the repo's own test: embeds a SMILES, extracts the interaction profile,
-# generates, xTB-relaxes, and scores. Exercises every component the real runs need.
+# The repo's own test: embed, profile, generate, xTB-relax, score -- every
+# component the real runs need.
 cd "$REPO_DIR"
 python examples/basic_inference/basic_inference_test.py \
     --smiles "c1ccccc1" \

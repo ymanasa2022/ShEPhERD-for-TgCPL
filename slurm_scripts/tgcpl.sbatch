@@ -8,16 +8,8 @@
 #SBATCH --mem=32G
 #SBATCH --time=04:00:00
 
-# =============================================================================
-# GENERIC SLURM job script for TgCPL ShEPhERD-2 generation.
-#
-# For Great Lakes use greatlakes_tgcpl.sbatch instead. This is the portable
-# fallback: hardcoded paths, conda activated by name.
-#
-# Edit the three paths below, then:
-#   mkdir -p logs
-#   sbatch slurm_scripts/tgcpl.sbatch
-# =============================================================================
+# Generic SLURM job for TgCPL generation: hardcoded paths, conda by name.
+# On Great Lakes use greatlakes_tgcpl.sbatch instead. Edit the paths below.
 
 TGCPL_DIR="$HOME/ShEPhERD-for-TgCPL"     # this repo
 SCRIPT="$TGCPL_DIR/scripts/tgcpl/tgcpl_generate.py"
@@ -34,11 +26,7 @@ echo "Node: $HOSTNAME"
 echo "GPU: $(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null || echo 'unknown')"
 echo ""
 
-# -------------------------------------------------------------------
-# Run 1: Generate from all 4 lead molecules
-#         Condition on shape + ESP + pharmacophores
-#         50 samples per lead  (200 total)
-# -------------------------------------------------------------------
+# Run 1: all leads, shape + ESP + pharmacophores, 50 samples each.
 python "$SCRIPT" \
     --ref-smiles all \
     --n-samples 50 \
@@ -47,10 +35,7 @@ python "$SCRIPT" \
     --output-dir "$OUTPUT_DIR/run1_all_leads" \
     --seed 42
 
-# -------------------------------------------------------------------
-# Run 2: Shape + ESP only (no pharmacophore) from best leads
-#         Allows more structural diversity
-# -------------------------------------------------------------------
+# Run 2: no pharmacophore constraint -> more structural diversity.
 python "$SCRIPT" \
     --ref-smiles Cpd18 \
     --n-samples 100 \
@@ -59,10 +44,7 @@ python "$SCRIPT" \
     --output-dir "$OUTPUT_DIR/run2_shape_esp_Cpd18" \
     --seed 42
 
-# -------------------------------------------------------------------
-# Run 3: Grow molecules (add 2-6 heavy atoms) from Cpd18
-#         Goal: explore extended P2 or larger P3 groups
-# -------------------------------------------------------------------
+# Run 3: grow by 2-6 heavy atoms to explore extended P2 / larger P3.
 python "$SCRIPT" \
     --ref-smiles Cpd18 \
     --n-samples 100 \
@@ -73,9 +55,7 @@ python "$SCRIPT" \
     --output-dir "$OUTPUT_DIR/run3_grow_Cpd18" \
     --seed 42
 
-# -------------------------------------------------------------------
-# Run 4: Scaffold-constrained (keep triazine-CN-morpholine warhead)
-# -------------------------------------------------------------------
+# Run 4: scaffold-constrained, keeping the triazine-CN-morpholine warhead.
 python "$SCRIPT" \
     --ref-smiles Cpd12 \
     --n-samples 100 \

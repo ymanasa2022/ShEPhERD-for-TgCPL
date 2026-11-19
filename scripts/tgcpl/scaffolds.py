@@ -1,20 +1,13 @@
-"""
-Scaffold cores for --scaffold-constraint: which atoms stay fixed during
-generation, expressed as SMARTS matched against the reference conformer.
+"""Scaffold cores for --scaffold-constraint: atoms pinned during generation.
 
 ShEPhERD conditions on a 3D field, not a substructure, so pinning atoms is the
-only hard structural guarantee that the warhead survives.
-
-  warhead                  8  nitrile + triazine; P1 and P2 free
-  warhead_p2n              9  + P2 nitrogen, so its two groups regrow in place
-  warhead_morpholine      14  + P1 morpholine
-  warhead_morpholine_p2n  15  both; pairs with warhead_p2n to isolate P1
-
-Freeing P1 changes the nitrile's electrophilicity, so those runs need a
-reactivity check, not just a docking score.
+only hard guarantee the warhead survives.
 
 [N;!R] is load-bearing: plain N matches twice (P2 or morpholine nitrogen) and
 get_scaffold_atom_indices takes matches[0], pinning the wrong one.
+
+Cores that free P1 change the nitrile's electrophilicity, so those runs need a
+reactivity check, not just a docking score.
 """
 
 from __future__ import annotations
@@ -28,7 +21,7 @@ SCAFFOLD_CORES: dict[str, str] = {
     "warhead_morpholine_p2n": "N#Cc1nc(N2CCOCC2)nc([N;!R])n1",
 }
 
-#: Pinned-atom count per core; the pre-flight test asserts against this.
+# Pinned-atom count per core; the pre-flight test asserts against this.
 CORE_ATOM_COUNTS: dict[str, int] = {
     "warhead": 8,
     "warhead_p2n": 9,
@@ -36,7 +29,6 @@ CORE_ATOM_COUNTS: dict[str, int] = {
     "warhead_morpholine_p2n": 15,
 }
 
-#: Cores that leave the P1 substituent free to be regenerated.
 P1_FREE_CORES = frozenset({"warhead", "warhead_p2n"})
 
 # Back-compat alias; previously the only core.
@@ -46,7 +38,6 @@ DEFAULT_CORE = "warhead_morpholine"
 
 
 def core_names() -> list[str]:
-    """Names accepted by --scaffold-core."""
     return list(SCAFFOLD_CORES)
 
 
@@ -60,5 +51,4 @@ def get_scaffold_atom_indices(
     matches = mol.GetSubstructMatches(core_query, useChirality=False)
     if not matches:
         return []
-    # Flatten all matches (take first if multiple)
     return list(matches[0])

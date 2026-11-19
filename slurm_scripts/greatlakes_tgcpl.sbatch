@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
-# =============================================================================
-# greatlakes_tgcpl.sh — the five TgCPL generation runs, as a job array.
+# The five TgCPL generation runs, as a job array (one failure costs only its
+# own task, and each task gets the full wall clock).
 #
-# Submit all:        sbatch slurm_scripts/greatlakes_tgcpl.sbatch
-# Submit a subset:   sbatch --array=1,3 greatlakes_tgcpl.sh
-#
-# An array runs the five independently and in parallel, so one failure does not
-# cost the others, and each gets the full wall clock rather than sharing it.
-# =============================================================================
+#   task 1  all leads, shape+ESP+pharm
+#   task 2  Cpd18, shape+ESP only
+#   task 3  Cpd18, grown 2-6 atoms
+#   task 4  Cpd12, scaffold-constrained
+#   task 5  dual-target Cpd18 vs Cpd1
+#   task 6  SUPERSEDED by greatlakes_redesign.sbatch
+#   task 99 Cpd12 redesign under a 400 Da ceiling
 #SBATCH --job-name=tgcpl_gen
 #SBATCH --account=maom0          # must match your Slurm account: run `my_accounts`
 #SBATCH --partition=gpu
@@ -37,8 +38,7 @@ echo
 
 case "$SLURM_ARRAY_TASK_ID" in
 
-  1)  # All 8 leads, full conditioning. The broad baseline sweep.
-      echo ">>> run1: all leads, shape+ESP+pharm, 50 each (400 total)"
+  1)  echo ">>> run1: all leads, shape+ESP+pharm, 50 each (400 total)"
       python "$TGCPL_PKG_DIR/tgcpl_generate.py" \
           --ref-smiles all \
           --n-samples 50 \
@@ -48,7 +48,7 @@ case "$SLURM_ARRAY_TASK_ID" in
           --seed 42
       ;;
 
-  2)  # Drop the pharmacophore constraint -> more structural diversity.
+  2)  # No pharmacophore constraint -> more structural diversity.
       echo ">>> run2: Cpd18, shape+ESP only, 100 samples"
       python "$TGCPL_PKG_DIR/tgcpl_generate.py" \
           --ref-smiles Cpd18 \
@@ -59,8 +59,7 @@ case "$SLURM_ARRAY_TASK_ID" in
           --seed 42
       ;;
 
-  3)  # Grow 2-6 heavy atoms: explore extended P2 / larger P3.
-      echo ">>> run3: Cpd18, grown by 2-6 atoms, 100 samples"
+  3)  echo ">>> run3: Cpd18, grown by 2-6 atoms, 100 samples"
       python "$TGCPL_PKG_DIR/tgcpl_generate.py" \
           --ref-smiles Cpd18 \
           --n-samples 100 \
@@ -72,7 +71,7 @@ case "$SLURM_ARRAY_TASK_ID" in
           --seed 42
       ;;
 
-  4)  # Keep the triazine-CN-morpholine warhead fixed.
+  4)  # Keeps the triazine-CN-morpholine warhead fixed.
       echo ">>> run4: Cpd12, scaffold-constrained, 100 samples"
       python "$TGCPL_PKG_DIR/tgcpl_generate.py" \
           --ref-smiles Cpd12 \
@@ -84,7 +83,7 @@ case "$SLURM_ARRAY_TASK_ID" in
           --seed 42
       ;;
 
-  5)  # Selectivity encoded at the model level: ON Cpd18, NOT Cpd1.
+  5)  # Selectivity at the model level: ON Cpd18, NOT Cpd1.
       echo ">>> run5: dual-target Cpd18 vs Cpd1, scaffold-constrained, 100 samples"
       python "$TGCPL_PKG_DIR/tgcpl_generate.py" \
           --dual-target \
@@ -97,26 +96,18 @@ case "$SLURM_ARRAY_TASK_ID" in
           --seed 42
       ;;
 
-  6)  # SUPERSEDED by greatlakes_redesign.sh (4-run 2x2 at MW<=500). Kept only
-      # so an old `sbatch --array=6` does not silently vanish.
+  6)  # Kept so an old `sbatch --array=6` fails loudly instead of vanishing.
       echo "run6 moved: use  sbatch --array=1-4 greatlakes_redesign.sh"; exit 1
       ;;
 
-  99) # VMCC-0005199 (= Cpd12) three-point redesign, under a 400 Da ceiling.
+  99) # VMCC-0005199 (= Cpd12), 400 Da ceiling. Pins the warhead + P2 nitrogen
+      # only, so P1 and both groups on that nitrogen regenerate.
       #
-      # Pins the warhead + the P2 nitrogen only, so the P1 morpholine and BOTH
-      # groups on that nitrogen (benzylic aryl/cycloalkyl and the basic chain)
-      # are regenerated.
-      #
-      # The negative --add-atoms-range is the MW lever: Cpd12 embeds to 74 atoms
-      # incl. H, and this series runs ~6.7 Da/atom, so N_x1 57-63 targets the
-      # 380-420 Da band. Without it N_x1 defaults to the reference's 74 and
-      # generation lands near 495 Da, nowhere near the ceiling. Note the flag
-      # was written for GROWING; negatives are arithmetically fine but
-      # unexercised, so run this once at --n-samples 2 before the full job.
-      #
-      # Pass the two values space-separated. "--add-atoms-range=-17 -11" does
-      # NOT parse; argparse needs "--add-atoms-range -17 -11".
+      # The negative --add-atoms-range is the MW lever: ~6.7 Da/atom here, so
+      # N_x1 57-63 targets 380-420 Da; at the reference 74 atoms generation
+      # lands near 495 Da. The flag was written for GROWING, so negatives are
+      # unexercised -- try --n-samples 2 first. Must be space-separated;
+      # "--add-atoms-range=-17 -11" does not parse.
       echo ">>> run6: VMCC-0005199/Cpd12, P1+P2+P3 free, N_x1 57-63, 150 samples"
       python "$TGCPL_PKG_DIR/tgcpl_generate.py" \
           --ref-smiles Cpd12 \

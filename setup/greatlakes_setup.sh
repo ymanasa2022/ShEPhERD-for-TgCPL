@@ -1,13 +1,5 @@
 #!/usr/bin/env bash
-# =============================================================================
-# greatlakes_setup.sh — install ShEPhERD-2 on U-M Great Lakes
-#
-# Run ONCE, on a login node (not via sbatch):
-#   bash greatlakes_setup.sh            # default CUDA build
-#   bash greatlakes_setup.sh cu124      # pick another
-#
-# Idempotent: safe to re-run. Paths live in greatlakes_config.sh.
-# =============================================================================
+# Install ShEPhERD-2 on Great Lakes. Run once on a login node; idempotent.
 
 set -euo pipefail
 
@@ -26,7 +18,6 @@ echo "    hf_home : $HF_HOME"
 echo "    torch   : $CUDA_EXTRA"
 echo
 
-# --- 0. preconditions ------------------------------------------------------
 # --pre-install skips the ENV_PREFIX check; creating it is this script's job.
 if ! tgcpl_check_paths --pre-install; then
     echo
@@ -36,11 +27,9 @@ fi
 
 mkdir -p "$SCRATCH" "$(dirname "$ENV_PREFIX")" "$HF_HOME" "$SCRATCH/logs"
 
-# --- 1. conda --------------------------------------------------------------
-# Explicit hook: the inherited CONDA_EXE points at a dead mount path.
+# Source the hook explicitly: the inherited CONDA_EXE points at a dead mount.
 source "$CONDA_SH"
 
-# --- 2. repo ---------------------------------------------------------------
 if [ -d "$REPO_DIR/.git" ]; then
     echo "[1/4] Repo exists — pulling..."
     git -C "$REPO_DIR" pull --ff-only
@@ -50,8 +39,7 @@ else
     git clone https://github.com/coleygroup/shepherd2.git "$REPO_DIR"
 fi
 
-# --- 3. environment --------------------------------------------------------
-# python<3.12 is required by shepherd; 3.12 fails at metadata resolution.
+# Must be python 3.11: 3.12 fails at metadata resolution.
 if [ -d "$ENV_PREFIX" ]; then
     echo "[2/4] Env exists at $ENV_PREFIX — skipping create."
 else
@@ -71,14 +59,12 @@ if [ "$_py_prefix" != "$ENV_PREFIX" ]; then
 fi
 echo "      active python: $(python -V 2>&1) at $_py_prefix"
 
-# --- 4. shepherd2 ----------------------------------------------------------
 echo "[3/4] Installing shepherd2 [$CUDA_EXTRA]..."
 cd "$REPO_DIR"
 pip install --quiet uv
 # No --system: install into the active conda prefix.
 uv pip install -e ".[${CUDA_EXTRA}]"
 
-# --- 5. verify -------------------------------------------------------------
 echo "[4/4] Verifying..."
 python - <<'PY'
 import shutil, sys, torch
