@@ -23,6 +23,15 @@ from tgcpl.properties import (
     reasons_to_reject,
     thresholds,
 )
+from tgcpl.selectivity import (
+    SELECTIVE_LIKE_CUTOFF,
+    WEIGHTS,
+    benzylic_ring_has_heteroatom,
+    benzylic_ring_sizes,
+    describe_selectivity,
+    selectivity_flags,
+    selectivity_score,
+)
 from tgcpl.scaffolds import (
     CORE_ATOM_COUNTS,
     DEFAULT_CORE,
@@ -57,4 +66,12 @@ __all__ = [
     "pains_catalog",
     "reasons_to_reject",
     "thresholds",
+    # selectivity
+    "SELECTIVE_LIKE_CUTOFF",
+    "WEIGHTS",
+    "benzylic_ring_has_heteroatom",
+    "benzylic_ring_sizes",
+    "describe_selectivity",
+    "selectivity_flags",
+    "selectivity_score",
 ]

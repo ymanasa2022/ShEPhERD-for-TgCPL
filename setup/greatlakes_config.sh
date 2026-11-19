@@ -22,6 +22,11 @@ OUTPUT_ROOT="$SCRATCH/SHEP_out"
 
 export HF_HOME="$SCRATCH/intermediate_data/shep_hf_cache"
 
+# Boltz-2 gets a separate env on purpose: it pins its own torch, which would
+# break torch_cluster/torch_scatter in the shepherd env.
+BOLTZ_ENV="$TURBO/micromamba/envs/boltz2"
+BOLTZ_ROOT="$SCRATCH/boltz"          # boltz_in/, boltz_out/, msa/
+export BOLTZ_CACHE="$SCRATCH/intermediate_data/boltz_cache"   # model weights
 
 CONDA_SH="$TURBO/miniconda3/etc/profile.d/conda.sh"
 

@@ -8,13 +8,19 @@ scripts/
     leads.py                reference compounds + registry-id lookup
     scaffolds.py            scaffold cores for --scaffold-constraint
     properties.py           descriptors, thresholds, rejection logic
+    selectivity.py          SAR-derived TgCPL-over-HsCPL substructure rules
     conformers.py           3D embedding (the one module needing shepherd)
     tgcpl_generate.py       generation driver
   generate/
     filter_generated.py     triage -> passing.smi + passing.sdf
+    selectivity_score.py    rank by selectivity -> selectivity.tsv + selected.sdf
     summarize_run.py        reporting over a run directory
     baseline_scores.py      null-model comparison
     compare_scaffold.sh     A/B two scaffold cores locally
+  dock/
+    fetch_targets.sh        pull 3F75 / 5MAJ sequences from RCSB
+    boltz_prep.py           selected.sdf -> Boltz-2 YAML for BOTH targets
+    boltz_selectivity.py    pair the two runs, rank by predicted window
 setup/
   greatlakes_config.sh      ALL Great Lakes paths -- the one file to edit
   greatlakes_env.sh         activate; sourced by every job script
@@ -23,14 +29,16 @@ setup/
   setup_shepherd2.sh        portable installer for another cluster
 slurm_scripts/
   greatlakes_redesign.sbatch   the 2x2 redesign campaign (array 1-4)
+  greatlakes_boltz_selectivity.sbatch  dual-target docking (array 1-2)
   greatlakes_tgcpl.sbatch      the original five runs (array 1-5)
   tgcpl.sbatch                 generic non-Great-Lakes fallback
 tests/
-  test_redesign.py          pre-flight: cores, sizing, filter. No GPU needed
+  test_redesign.py          pre-flight: cores, sizing, filter, selectivity
   local_smoke_test.sh       end-to-end on CPU
   greatlakes_smoke_test.sh  end-to-end on a GPU node
 data/
   lead_molecules.smi        SMILES + IC50/selectivity for all leads
+  targets/                  mature TgCPL / HsCPL sequences for docking
 ```
 
 The entry points add their own package directory to `sys.path`, so they run
@@ -238,34 +246,107 @@ absorption/clearance/hERG endpoints need a trained predictor. A pass means "not
 obviously disqualified".
 
 Then prioritize candidates for:
-1. Boltz-2 covalent docking (as in the paper — use PDB 3F75 for TgCPL)
+1. The selectivity study below (ligand-based triage, then dual-target docking)
 2. QSAR model prediction (the AutoML ensemble from the paper)
 3. Experimental IC50 testing
 
 ---
 
-## Generating from Cpd12 and Cpd18
+## Selectivity study (TgCPL vs HsCPL)
 
-Tasks 2 and 4 of the redesign campaign are the two TgCPL-selective leads with
-the P1 morpholine pinned:
+Selectivity is decided at the **docking** stage, not during generation.
+Generation conditions on Cpd12 and Cpd18 — both TgCPL-selective leads — and
+everything that survives triage gets folded against both enzymes.
+
+```
+greatlakes_redesign.sbatch --array=2,4   ->  passing.sdf
+                                                  |
+                                             boltz_prep.py
+                                                  |
+                                      boltz predict (TgCPL) + (HsCPL)
+                                                  |
+                                         boltz_selectivity.py
+```
+
+### Generate
+
+Tasks 2 and 4 of the existing redesign campaign are Cpd12 and Cpd18 with the
+P1 morpholine pinned:
 
 ```bash
 RUN_STAMP=$(date +%Y%m%d_%H%M%S) \
     sbatch --export=ALL --array=2,4 slurm_scripts/greatlakes_redesign.sbatch
 ```
 
-| task | reference | core |
-|---|---|---|
-| 2 | Cpd12 | `warhead_morpholine_p2n` |
-| 4 | Cpd18 | `warhead_morpholine_p2n` |
+Use `--array=1-4` instead to also get the two arms that free P1. Those explore
+S1 but change the nitrile's electrophilicity, so they need a covalent-reactivity
+check on top of a docking score.
 
-Both pin the P2 nitrogen, so its two substituents regrow in every sample while
-the warhead and P1 stay fixed. Use `--array=1-4` to also get the arms that free
-P1: those explore S1 but change the nitrile's electrophilicity, so they need a
-covalent-reactivity check rather than a docking score alone.
+Each task ends by running `filter_generated.py`, which writes `passing.sdf`
+with xTB-relaxed coordinates — that file is the docking input directly.
 
-Each task ends by running `filter_generated.py`, which writes `passing.smi` and
-`passing.sdf` (xTB-relaxed coordinates, ready for docking).
+### Dock against both targets
+
+```bash
+bash scripts/dock/fetch_targets.sh                       # once
+RUN=$OUTPUT_ROOT/redesign_VMCC-0005222_p1kept_<stamp>    # Cpd18's run
+python scripts/dock/boltz_prep.py "$RUN/passing.sdf" -o "$BOLTZ_ROOT/boltz_in"
+# sbatch --array=1-2 slurm_scripts/greatlakes_boltz_selectivity.sbatch
+python scripts/dock/boltz_selectivity.py "$BOLTZ_ROOT/boltz_out" \
+    --ligands "$BOLTZ_ROOT/boltz_in/ligands.tsv"
+```
+
+Check `wc -l "$RUN/passing.smi"` first. Every ligand costs two co-foldings, so
+pass `--limit N` to `boltz_prep.py` if that number is large.
+
+`affinity_pred_value` is log10(IC50 / µM), so the readout is
+
+```
+d_logIC50 = hscpl_value - tgcpl_value        positive = TgCPL-preferring
+fold      = 10 ** d_logIC50
+```
+
+**The four leads are folded in as controls by default**, under `CTRL_<name>`.
+They have measured IC50s against both enzymes, so `boltz_selectivity.py` prints
+the predicted-vs-measured comparison *above* the ranked list. Read it first.
+Boltz-2's affinity head was trained to rank actives against a single target;
+differencing two independent predictions across two homologues is off-label,
+and the two heads are not guaranteed to share a zero. Four congeneric controls
+cannot validate that — but they can invalidate it. If the control correlation
+comes out flat or inverted, the right result to report is "this did not
+transfer", not a top-10 list.
+
+Also true of every number here: nothing models the covalent bond to
+Cys31/Cys25. These are non-covalent poses of a covalent inhibitor, so they
+speak to pocket complementarity and not to the real binding mode.
+
+### Optional: ligand-based pre-ranking
+
+`selectivity_score.py` scores molecules for selectivity *without* a protein,
+using substructure rules from the series SAR (`tgcpl/selectivity.py`) and
+3D ShEPhERD-score similarity to the selective leads minus the non-selective
+one. It is not part of the pipeline above — docking is the readout — but it
+is a cheap way to choose which molecules to dock when `passing.sdf` is larger
+than the GPU budget:
+
+```bash
+python scripts/generate/selectivity_score.py "$RUN" --3d --require-series --top 40
+python scripts/dock/boltz_prep.py "$RUN/selected.sdf" -o "$BOLTZ_ROOT/boltz_in"
+```
+
+Treat its output as a triage order, not a prediction. The rules are hand-set
+from four compounds and reward resemblance to the one chemotype already known
+to work, so they penalise exactly the novelty generation exists to find. And
+measured on the leads, whole-molecule ESP separates this congeneric series by
+only ~0.07 — which is why selectivity is decided by docking here and not by
+ligand similarity.
+
+For runs that free the P1 morpholine, add a covalent-reactivity check: the
+nitrile's electrophilicity depends on how electron-poor the triazine is, and P1
+tunes exactly that. A docking score will not catch a warhead that would not
+react.
+
+---
 
 ## Lead molecules
 

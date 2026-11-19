@@ -22,7 +22,7 @@ TGCPL_PKG = REPO / "scripts" / "tgcpl"
 # The package lives under scripts/, not at the repo root.
 sys.path.insert(0, str(REPO / "scripts"))
 
-from tgcpl import leads, properties, scaffolds          # noqa: E402
+from tgcpl import leads, properties, scaffolds, selectivity  # noqa: E402
 
 PASS, FAIL = "PASS", "FAIL"
 _results: list[tuple[str, str, str]] = []
@@ -232,6 +232,51 @@ def test_generation(device: str) -> None:
                           f"{Chem.MolToSmiles(Chem.RemoveHs(m))[:60]}")
 
 
+def test_selectivity_rules() -> None:
+    section("5. selectivity rules separate the leads")
+
+    # The rules are hand-set from these four compounds, so passing here proves
+    # the SMARTS still match -- NOT that the rules predict anything. A real
+    # test would need held-out compounds, which the series does not have.
+    scores = {}
+    for name, lead in leads.LEADS.items():
+        mol = Chem.MolFromSmiles(lead["smiles"])
+        d = selectivity.describe_selectivity(mol)
+        scores[name] = d
+        print(f"        {name:<7} score {d['sel_score']:+5.1f}  "
+              f"rings {d['benzylic_rings']}  {d['sel_flags']}")
+
+    # Cpd1 is the only lead with no benzylic bulk, and the least selective.
+    check("Cpd1 is not selective-like", scores["Cpd1"]["selective_like"], False)
+    for name in ("Cpd12", "Cpd13", "Cpd18"):
+        check(f"{name} is selective-like", scores[name]["selective_like"], True)
+
+    # Cpd18's piperidine NH is what the secondary-amine term is for.
+    check("Cpd18 scores above Cpd12",
+          f"{scores['Cpd18']['sel_score']} > {scores['Cpd12']['sel_score']}",
+          "strictly greater",
+          ok=scores["Cpd18"]["sel_score"] > scores["Cpd12"]["sel_score"])
+
+    # Ring detection: cyclohexyl on Cpd12, cycloheptyl on Cpd13.
+    check("Cpd12 benzylic ring", scores["Cpd12"]["benzylic_rings"], [6])
+    check("Cpd13 benzylic ring", scores["Cpd13"]["benzylic_rings"], [7])
+
+    # THP analogue: same shape, polar ring, known to kill potency. Must trip
+    # the penalty rather than scoring like Cpd12.
+    thp = Chem.MolFromSmiles(
+        "CCN(CC)CCN(c1nc(C#N)nc(N2CCOCC2)n1)C(c1ccc(F)cc1)C1CCOCC1"
+    )
+    d_thp = selectivity.describe_selectivity(thp)
+    check("THP analogue flagged polar-ring", d_thp["benzylic_polar_ring"], True)
+    check("THP analogue scores below Cpd12",
+          f"{d_thp['sel_score']} < {scores['Cpd12']['sel_score']}",
+          "strictly less",
+          ok=d_thp["sel_score"] < scores["Cpd12"]["sel_score"])
+
+    # All four leads must still look like the series at all.
+    check("all leads in series",
+          [n for n, d in scores.items() if not d["in_series"]], [])
+
 
 def main() -> None:
     ap = argparse.ArgumentParser(
@@ -245,13 +290,14 @@ def main() -> None:
     a = ap.parse_args()
 
     print("=" * 70)
-    print("  Pre-flight: scaffold cores, sizing, property filter")
+    print("  Pre-flight: scaffold cores, sizing, property filter, selectivity")
     print("=" * 70)
 
     test_cores()
     test_sizing()
     test_filter_logic()
     test_filter_io()
+    test_selectivity_rules()
     if a.full:
         test_generation(a.device)
 

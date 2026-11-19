@@ -84,16 +84,49 @@ sbatch --array=3 slurm_scripts/greatlakes_tgcpl.sbatch  # just run 3
 A job array rather than one script running five jobs back to back: they run in
 parallel, each gets the full 8 h, and one failure doesn't take the rest down.
 
-## 5. Generating from Cpd12 and Cpd18
+## 5. The selectivity study
+
+Generation is plain TgCPL conditioning on the two selective leads -- tasks 2
+and 4 of the redesign campaign, Cpd12 and Cpd18 with P1 pinned. Selectivity is
+decided downstream, by docking against both enzymes.
 
 ```bash
 RUN_STAMP=$(date +%Y%m%d_%H%M%S) \
     sbatch --export=ALL --array=2,4 slurm_scripts/greatlakes_redesign.sbatch
 ```
 
-Task 2 is Cpd12, task 4 is Cpd18, both with P1 pinned. The shared `RUN_STAMP`
-matters: without it the array tasks stamp themselves minutes apart and stop
-looking like one campaign.
+Then the docking stage. **One-time install**, in its own env -- boltz pins its
+own torch, and installing it into the shepherd env breaks
+`torch_cluster`/`torch_scatter`:
+
+```bash
+source setup/greatlakes_config.sh
+source "$CONDA_SH"
+conda create -y --prefix "$BOLTZ_ENV" -c conda-forge python=3.11
+conda activate "$BOLTZ_ENV" && pip install boltz -U
+bash scripts/dock/fetch_targets.sh          # needs outbound network
+```
+
+Per run, folding every passing molecule against both targets:
+
+```bash
+RUN=$OUTPUT_ROOT/redesign_VMCC-0005222_p1kept_<stamp>     # Cpd18's run
+wc -l "$RUN/passing.smi"                                  # check the count first
+python scripts/dock/boltz_prep.py "$RUN/passing.sdf" -o "$BOLTZ_ROOT/boltz_in"
+
+jid=$(sbatch --parsable --array=1-2 slurm_scripts/greatlakes_boltz_selectivity.sbatch)
+sbatch --dependency=afterok:$jid slurm_scripts/greatlakes_boltz_selectivity.sbatch --aggregate
+```
+
+Two things to check before scaling up:
+
+- **Outbound network from the GPU node.** `--use_msa_server` reaches
+  `api.colabfold.com`. One `boltz predict` call per target directory fetches
+  the MSA once for all its ligands, since they share a protein sequence -- but
+  if the node is firewalled, generate the a3m elsewhere and re-run
+  `boltz_prep.py --msa-dir`.
+- **Cost.** One co-folding per ligand per target, plus 4 controls. Use
+  `boltz_prep.py --limit N` until the controls look sane.
 
 ## Monitoring
 
@@ -111,7 +144,6 @@ These are the parts I could not check from your laptop:
 1. **Slurm account.** Run `my_accounts`. The `#SBATCH --account=` line in
    `slurm_scripts/greatlakes_redesign.sbatch`,
    `slurm_scripts/greatlakes_tgcpl.sbatch`,
-   `slurm_scripts/greatlakes_selectivity.sbatch`,
    `slurm_scripts/greatlakes_boltz_selectivity.sbatch` and
    `tests/greatlakes_smoke_test.sh` must match it exactly or sbatch refuses the job.
    These are `#SBATCH` directives, parsed before the shell runs, so they
